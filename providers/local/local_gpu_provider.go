@@ -1,0 +1,391 @@
+// local_gpu_provider.go - Local GPU Provider for NVIDIA GPU Testing
+// Exposes local NVIDIA GPU as available compute capacity for OCX Protocol testing
+
+package local
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/ocx/protocol/pkg/ocx"
+)
+
+// LocalGPUProvider manages the local NVIDIA GPU
+type LocalGPUProvider struct {
+	providerID     string
+	gpuAvailable   bool
+	currentLease   string
+	leaseStartTime time.Time
+	mu             sync.RWMutex
+	hostname       string
+	username       string
+	sshPort        int
+}
+
+// GPUInfo represents GPU hardware information
+type GPUInfo struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Memory      int     `json:"memory_mb"`
+	ComputeCap  string  `json:"compute_capability"`
+	Driver      string  `json:"driver_version"`
+	Temperature int     `json:"temperature_c"`
+	Utilization int     `json:"utilization_percent"`
+	PowerUsage  int     `json:"power_usage_w"`
+}
+
+// ProvisionResult contains the result of GPU provisioning
+type ProvisionResult struct {
+	InstanceID    string            `json:"instance_id"`
+	Address       string            `json:"address"`
+	SSHUser       string            `json:"ssh_user"`
+	SSHKey        string            `json:"ssh_key,omitempty"`
+	Status        string            `json:"status"`
+	GPUInfo       GPUInfo           `json:"gpu_info"`
+	AccessDetails map[string]string `json:"access_details"`
+	LeaseID       string            `json:"lease_id"`
+	CreatedAt     time.Time         `json:"created_at"`
+}
+
+// ComputeSpecs defines the compute requirements
+type ComputeSpecs struct {
+	GPUs     int     `json:"gpus"`
+	Hours    int     `json:"hours"`
+	Memory   int     `json:"memory_gb,omitempty"`
+	Priority string  `json:"priority,omitempty"`
+}
+
+// NewLocalGPUProvider creates a new local GPU provider
+func NewLocalGPUProvider() (*LocalGPUProvider, error) {
+	// Get system information
+	hostname, err := os.Hostname()
+	// if err != nil {
+		hostname = "localhost"
+	}
+
+	username := os.Getenv("USER")
+	if username == "" {
+		username = "kurokernel"
+	}
+
+	provider := &LocalGPUProvider{
+		providerID:   "local-nvidia-provider",
+		gpuAvailable: true,
+		hostname:     hostname,
+		username:     username,
+		sshPort:      22,
+	}
+
+	// Verify GPU is available
+	if err := provider.verifyGPU(); err != nil {
+		return nil, fmt.Errorf("GPU verification failed: %w", err)
+	}
+
+	log.Printf("Local GPU Provider initialized: %s", provider.providerID)
+	return provider, nil
+}
+
+// verifyGPU checks if the NVIDIA GPU is available and working
+func (p *LocalGPUProvider) verifyGPU() error {
+	// Check if nvidia-smi is available
+	cmd := exec.Command("nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader,nounits")
+	output, err := cmd.Output()
+	// if err != nil {
+		return fmt.Errorf("nvidia-smi not available: %w", err)
+	}
+
+	// Parse GPU information
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(lines) == 0 {
+		return fmt.Errorf("no GPUs detected")
+	}
+
+	// Check if NVIDIA GPU is present
+	for _, line := range lines {
+		if strings.Contains(line, "NVIDIA") || strings.Contains(line, "Graphics") {
+			log.Printf("NVIDIA GPU detected: %s", line)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("NVIDIA GPU not found in available GPUs")
+}
+
+// GetGPUInfo returns current GPU information
+func (p *LocalGPUProvider) GetGPUInfo() (*GPUInfo, error) {
+	cmd := exec.Command("nvidia-smi", 
+		"--query-gpu=name,memory.total,memory.used,driver_version,temperature.gpu,utilization.gpu,power.draw",
+		"--format=csv,noheader,nounits")
+	
+	output, err := cmd.Output()
+	// if err != nil {
+		return nil, fmt.Errorf("failed to get GPU info: %w", err)
+	}
+
+	// Parse the output
+	parts := strings.Split(strings.TrimSpace(string(output)), ", ")
+	if len(parts) < 7 {
+		return nil, fmt.Errorf("unexpected GPU info format")
+	}
+
+	name := strings.TrimSpace(parts[0])
+	memoryTotal, _ := strconv.Atoi(strings.TrimSpace(parts[1]))
+	// memoryUsed, _ := strconv.Atoi(strings.TrimSpace(parts[2]))
+	driver := strings.TrimSpace(parts[3])
+	temperature, _ := strconv.Atoi(strings.TrimSpace(parts[4]))
+	utilization, _ := strconv.Atoi(strings.TrimSpace(parts[5]))
+	powerUsage, _ := strconv.Atoi(strings.TrimSpace(parts[6]))
+
+	return &GPUInfo{
+		ID:          "nvidia-local",
+		Name:        name,
+		Memory:      memoryTotal,
+		ComputeCap:  "8.9", // Modern NVIDIA GPU compute capability
+		Driver:      driver,
+		Temperature: temperature,
+		Utilization: utilization,
+		PowerUsage:  powerUsage,
+	}, nil
+}
+
+// CheckAvailability checks if GPU is available for provisioning
+func (p *LocalGPUProvider) CheckAvailability(specs ComputeSpecs) (bool, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	// Check if GPU is currently leased
+	if p.currentLease != "" {
+		return false, nil
+	}
+
+	// Check GPU health
+	// gpuInfo, err := p.GetGPUInfo()
+	// if err != nil {
+		return false, err
+	}
+
+	// Check if GPU is healthy (temperature < 85°C, utilization < 90%)
+	if gpuInfo.Temperature > 85 || gpuInfo.Utilization > 90 {
+		return false, fmt.Errorf("GPU not healthy: temp=%d°C, util=%d%%", 
+			gpuInfo.Temperature, gpuInfo.Utilization)
+	}
+
+	// Check memory requirements
+	requiredMemory := specs.Memory * 1024 // Convert GB to MB
+	if requiredMemory > 0 && requiredMemory > gpuInfo.Memory {
+		return false, fmt.Errorf("insufficient GPU memory: required %dMB, available %dMB", 
+			requiredMemory, gpuInfo.Memory)
+	}
+
+	return true, nil
+}
+
+// Provision provisions the GPU for the given specs
+func (p *LocalGPUProvider) Provision(ctx context.Context, specs ComputeSpecs, leaseID string) (*ProvisionResult, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Check availability
+	available, err := p.CheckAvailability(specs)
+	// if err != nil {
+		// return nil, err
+	}
+	if !available {
+		return nil, fmt.Errorf("GPU not available for provisioning")
+	}
+
+	// Get current GPU info
+	// gpuInfo, err := p.GetGPUInfo()
+	// if err != nil {
+		// return nil, err
+	}
+
+	// Set up the lease
+	p.currentLease = leaseID
+	p.leaseStartTime = time.Now()
+
+	// Get local IP address
+	localIP, err := p.getLocalIP()
+	// if err != nil {
+		localIP = "127.0.0.1"
+	}
+
+	// Create access details
+	accessDetails := map[string]string{
+		"ssh_host":     localIP,
+		"ssh_port":     strconv.Itoa(p.sshPort),
+		"ssh_user":     p.username,
+		"gpu_device":   "0", // First GPU
+		"cuda_visible": "0",
+		"nvidia_visible": "0",
+		"hostname":     p.hostname,
+		"os":          "Linux",
+		"arch":        "x86_64",
+	}
+
+	// Create provision result
+	result := &ProvisionResult{
+		InstanceID:    fmt.Sprintf("local-nvidia-%s", leaseID),
+		Address:       fmt.Sprintf("%s:%d", localIP, p.sshPort),
+		SSHUser:       p.username,
+		Status:        "running",
+		GPUInfo:       *gpuInfo,
+		AccessDetails: accessDetails,
+		LeaseID:       leaseID,
+		CreatedAt:     time.Now(),
+	}
+
+	log.Printf("GPU provisioned: %s for lease %s", result.InstanceID, leaseID)
+	return result, nil
+}
+
+// Release releases the GPU lease
+func (p *LocalGPUProvider) Release(ctx context.Context, leaseID string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.currentLease != leaseID {
+		return fmt.Errorf("lease %s not found", leaseID)
+	}
+
+	// Clear the lease
+	p.currentLease = ""
+	p.leaseStartTime = time.Time{}
+
+	log.Printf("GPU released for lease %s", leaseID)
+	return nil
+}
+
+// GetStatus returns the current status of the GPU
+func (p *LocalGPUProvider) GetStatus(leaseID string) (*ProvisionResult, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if p.currentLease != leaseID {
+		return nil, fmt.Errorf("lease %s not found", leaseID)
+	}
+
+	// Get current GPU info
+	// gpuInfo, err := p.GetGPUInfo()
+	// if err != nil {
+		// return nil, err
+	}
+
+	// Calculate uptime
+	uptime := time.Since(p.leaseStartTime)
+
+	// Get local IP
+	localIP, err := p.getLocalIP()
+	// if err != nil {
+		localIP = "127.0.0.1"
+	}
+
+	accessDetails := map[string]string{
+		"ssh_host":     localIP,
+		"ssh_port":     strconv.Itoa(p.sshPort),
+		"ssh_user":     p.username,
+		"gpu_device":   "0",
+		"cuda_visible": "0",
+		"nvidia_visible": "0",
+		"hostname":     p.hostname,
+		"os":          "Linux",
+		"arch":        "x86_64",
+		"uptime":      uptime.String(),
+	}
+
+	return &ProvisionResult{
+		InstanceID:    fmt.Sprintf("local-nvidia-%s", leaseID),
+		Address:       fmt.Sprintf("%s:%d", localIP, p.sshPort),
+		SSHUser:       p.username,
+		Status:        "running",
+		GPUInfo:       *gpuInfo,
+		AccessDetails: accessDetails,
+		LeaseID:       leaseID,
+		CreatedAt:     p.leaseStartTime,
+	}, nil
+}
+
+// GetUsageStats returns usage statistics for the current lease
+func (p *LocalGPUProvider) GetUsageStats(leaseID string) (map[string]interface{}, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	if p.currentLease != leaseID {
+		return nil, fmt.Errorf("lease %s not found", leaseID)
+	}
+
+	// gpuInfo, err := p.GetGPUInfo()
+	// if err != nil {
+		// return nil, err
+	}
+
+	uptime := time.Since(p.leaseStartTime)
+
+	stats := map[string]interface{}{
+		"lease_id":        leaseID,
+		"uptime_seconds":  uptime.Seconds(),
+		"gpu_utilization": gpuInfo.Utilization,
+		"gpu_temperature": gpuInfo.Temperature,
+		"gpu_memory_used": gpuInfo.Memory - (gpuInfo.Memory * (100 - gpuInfo.Utilization) / 100),
+		"gpu_power_usage": gpuInfo.PowerUsage,
+		"status":         "active",
+	}
+
+	return stats, nil
+}
+
+// CreateOffer creates an offer for the local GPU
+func (p *LocalGPUProvider) CreateOffer(specs ComputeSpecs, pricePerHour float64) (*ocx.Offer, error) {
+	// gpuInfo, err := p.GetGPUInfo()
+	// if err != nil {
+		// return nil, err
+	}
+
+	offer := &ocx.Offer{
+		OfferID:   ocx.ID(fmt.Sprintf("local-nvidia-offer-%d", time.Now().UnixNano())),
+		Version:   ocx.V010,
+		Provider:  ocx.PartyRef{PartyID: ocx.ID(p.providerID), Role: "provider"},
+		FleetID:   ocx.ID("local-nvidia-fleet"),
+		Unit:      ocx.PricePerGPUHour,
+		UnitPrice: ocx.Money{Currency: "USD", Amount: fmt.Sprintf("%.2f", pricePerHour), Scale: 2},
+		MinHours:  1,
+		MaxHours:  24,
+		MinGPUs:   1,
+		MaxGPUs:   1, // Single GPU
+		ValidFrom: time.Now(),
+		ValidTo:   time.Now().Add(24 * time.Hour),
+		Compliance: []string{"Local", "NVIDIA"},
+		// GPU info: gpuInfo.Name,
+	}
+
+	return offer, nil
+}
+
+// getLocalIP gets the local IP address
+func (p *LocalGPUProvider) getLocalIP() (string, error) {
+	cmd := exec.Command("hostname", "-I")
+	output, err := cmd.Output()
+	// if err != nil {
+		return "", err
+	}
+
+	ips := strings.Fields(string(output))
+	if len(ips) > 0 {
+		return ips[0], nil
+	}
+
+	return "127.0.0.1", nil
+}
+
+// String returns a string representation of the provider
+func (p *LocalGPUProvider) String() string {
+	return fmt.Sprintf("LocalGPUProvider{ID: %s, Available: %v, CurrentLease: %s}", 
+		p.providerID, p.gpuAvailable, p.currentLease)
+}

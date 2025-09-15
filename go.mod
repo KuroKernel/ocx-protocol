@@ -1,4 +1,4 @@
-module github.com/ocx/protocol
+module ocx.local
 
 go 1.18
 

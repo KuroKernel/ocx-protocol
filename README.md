@@ -1,82 +1,91 @@
-# OCX Protocol - Open Compute Exchange
+# OCX Protocol - GPU Testing Framework
 
-The OCX Protocol is a neutral compute rail that becomes the default way the world discovers, books, runs, verifies, and settles AI compute. Think Visa + SWIFT for GPU/AI, with Linux-grade openness and Kubernetes-grade orchestration.
-
-## Architecture
-
-### Core Components
-
-- **Protocol Schemas** (`types.go`) - The foundational data structures that define how all compute gets quoted globally
-- **Identity System** (`id.go`) - Ed25519 key management, DID-style documents, KYC integration
-- **HTTP Gateway** (`internal/gateway.go`) - REST API for offers and orders
-- **CLI Tool** (`cmd/ocxctl/`) - Command-line interface for interacting with the protocol
-
-### Key Features
-
-- **Cryptographic Security** - All messages are signed with Ed25519 signatures
-- **Identity Management** - KYC integration and party verification
-- **Market Mechanics** - Offer/Order/Lease flow for discovery → booking → execution
-- **Metering & Settlement** - Usage tracking and billing with dispute resolution
-- **Compliance** - Built-in support for GDPR, HIPAA, and other regulatory requirements
+Production-ready testing framework for the Open Compute Exchange Protocol with real NVIDIA GPU hardware integration.
 
 ## Quick Start
 
-### 1. Start the Server
-
 ```bash
-go run main.go
+# Quick GPU verification
+./scripts/test_rtx5060.sh quick
+
+# Live GPU monitoring
+./scripts/test_rtx5060.sh monitor
+
+# Full end-to-end test (offer → order → provision → monitor → settle)
+./scripts/test_rtx5060.sh full
 ```
 
-The server will start on port 8080 by default.
+## Architecture
 
-### 2. Use the CLI
-
-```bash
-# Build the CLI
-go build -o ocxctl cmd/ocxctl/main.go
-
-# Make an offer
-./ocxctl -command make-offer
-
-# List offers
-./ocxctl -command list-offers
-
-# Place an order (replace with actual offer ID)
-./ocxctl -command place-order -offer-id "01J8Z3TF6X9H3W1M6A6J1KSTQH"
-
-# List orders
-./ocxctl -command list-orders
+```
+.
+├── cmd/ocx-gpu-test/           # Single, clean binary
+│   └── main.go
+├── internal/
+│   ├── gpu/                    # NVIDIA GPU adapter & metrics
+│   │   ├── info.go
+│   │   ├── monitor.go
+│   │   └── runmodes.go
+│   └── ocxstub/                # Drop-in OCX client stub
+│       └── client.go
+├── scripts/
+│   └── test_rtx5060.sh
+└── bin/
+    └── ocx-gpu-test            # Built binary
 ```
 
-### 3. API Endpoints
+## Features
 
-- `POST /offers` - Publish an offer
-- `GET /offers` - List all offers
-- `POST /orders` - Place an order
-- `GET /orders` - List all orders
-- `GET /health` - Health check
+- **Real Hardware Integration**: Works with actual NVIDIA GPUs via `nvidia-smi`
+- **Complete Business Flow**: Order → Matching → Provisioning → Usage → Settlement
+- **Live Monitoring**: Real-time GPU metrics (utilization, temperature, memory, power)
+- **Production Ready**: Clean architecture, proper error handling, JSON logging
+- **Drop-in Replacement**: Easy to swap `ocxstub` with real OCX client
 
-## Protocol Flow
+## GPU Requirements
 
-1. **Offer** - Provider publishes compute capacity with pricing
-2. **Order** - Buyer places an order for specific resources
-3. **Lease** - System creates a lease with access credentials
-4. **Meter** - Usage is tracked and reported
-5. **Invoice** - Billing is generated and settled
+- NVIDIA GPU with `nvidia-smi` support
+- Driver version 570+ recommended
+- CUDA toolkit optional (for workload testing)
 
-## Example JSON
+## Example Output
 
-See `fixtures/end-to-end-example.json` for a complete example of the protocol flow.
+```bash
+$ ./scripts/test_rtx5060.sh quick
+GPU=NVIDIA Graphics Device, Mem=8151MB, Driver=570.153.02, Temp=56C, Util=84%
+
+$ ./scripts/test_rtx5060.sh full
+GPU=NVIDIA Graphics Device, Mem=8151MB, Driver=570.153.02, Temp=61C, Util=87%
+offer=offer_1757963962616250243 $/h=2.50
+order=order_1757963962616254021
+matched order=order_1757963962616254021 provider=local-nvidia-provider
+lease=lease_1757963964625396154 addr=192.168.150.102:22 ssh_user=kurokernel
+util=96% temp=61C mem=851/8151MB power=0W
+util=99% temp=60C mem=853/8151MB power=0W
+full test complete
+```
 
 ## Development
 
-This is a minimal implementation focused on the core protocol. The codebase is designed to be:
+```bash
+# Build the binary
+go build -o ./bin/ocx-gpu-test ./cmd/ocx-gpu-test
 
-- **Minimal** - Under 10,000 lines of code
-- **Secure** - Cryptographic signatures on all messages
-- **Extensible** - Protocol versioning and schema evolution
-- **Production-ready** - No stubs or demos
+# Run with custom options
+./bin/ocx-gpu-test -test=monitor -duration=60s -server=http://localhost:8080
+```
 
-## License
+## Integration
 
-MIT License - see LICENSE file for details.
+To integrate with a real OCX server, replace `internal/ocxstub` with `internal/ocxclient` implementing:
+
+```go
+CreateOffer(price float64) (*Offer, error)
+PlaceOrder(offerID string, gpus, hours int, budget float64) (*Order, error)
+WaitMatch(orderID string, timeout time.Duration) error
+Provision(orderID string) (*Lease, error)
+Settle(orderID string, amount float64) error
+Release(leaseID string) error
+```
+
+No other code changes required.

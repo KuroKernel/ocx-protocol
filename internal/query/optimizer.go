@@ -20,11 +20,11 @@ type Statistics struct {
 
 type TableStats struct {
 	RowCount      int64
-	ColumnStats   map[string]*ColumnStats
+	FieldStats   map[string]*FieldStats
 	LastUpdated   time.Time
 }
 
-type ColumnStats struct {
+type FieldStats struct {
 	DistinctValues int64
 	NullCount      int64
 	MinValue       interface{}
@@ -40,14 +40,14 @@ type IndexRegistry struct {
 type Index struct {
 	Name        string
 	Table       string
-	Columns     []string
+	Fields     []string
 	Type        string
 	Selectivity float64
 }
 
 // QueryCondition represents a WHERE condition for optimization
-type QueryCondition struct {
-	Column   string
+type QueryConditionOld struct {
+	Field   string
 	Operator string
 	Value    interface{}
 }
@@ -88,7 +88,7 @@ func (opt *QueryOptimizer) OptimizeComputeQuery(ctx context.Context, query *Quer
 			Table:     "compute_units",
 			IndexHint: "idx_compute_units_region",
 			QueryCondition: &QueryCondition{
-				Column:   "geographic_region",
+				Field:   "geographic_region",
 				Operator: "IN",
 				Value:    regions,
 			},
@@ -102,7 +102,7 @@ func (opt *QueryOptimizer) OptimizeComputeQuery(ctx context.Context, query *Quer
 			Table:     "compute_units",
 			IndexHint: "idx_compute_units_hardware",
 			QueryCondition: &QueryCondition{
-				Column:   "hardware_type",
+				Field:   "hardware_type",
 				Operator: "=",
 				Value:    hardwareType,
 			},
@@ -114,7 +114,7 @@ func (opt *QueryOptimizer) OptimizeComputeQuery(ctx context.Context, query *Quer
 		Operation: SequentialScan, // Availability changes too fast for indexes
 		Table:     "compute_units",
 		QueryCondition: &QueryCondition{
-			Column:   "current_availability",
+			Field:   "current_availability",
 			Operator: "=",
 			Value:    "available",
 		},
@@ -137,7 +137,7 @@ func (opt *QueryOptimizer) OptimizeComputeQuery(ctx context.Context, query *Quer
 			Operation: HashJoin,
 			Table:     "provider_reputation_cache",
 			QueryCondition: &QueryCondition{
-				Column:   "overall_score",
+				Field:   "overall_score",
 				Operator: ">=",
 				Value:    minReputation,
 			},
@@ -168,7 +168,7 @@ func (opt *QueryOptimizer) extractQueryConditions(where *WhereClause) []QueryCon
 	predicates := make([]QueryCondition, len(where.QueryConditions))
 	for i, condition := range where.QueryConditions {
 		predicates[i] = QueryCondition{
-			Column:   condition.Field,
+			Field:   condition.Field,
 			Operator: condition.Operator,
 			Value:    condition.Value,
 		}
@@ -200,8 +200,8 @@ func (opt *QueryOptimizer) estimateSelectivity(index *Index, predicates []QueryC
 	// For compound indexes, estimate combined selectivity
 	selectivity := 1.0
 	for _, predicate := range predicates {
-		if index.CoversColumn(predicate.Column) {
-			columnStats := stats.GetColumnStats(predicate.Column)
+		if index.CoversField(predicate.Field) {
+			columnStats := stats.GetFieldStats(predicate.Field)
 			predicateSelectivity := opt.estimateQueryConditionSelectivity(predicate, columnStats)
 			selectivity *= predicateSelectivity
 		}
@@ -210,7 +210,7 @@ func (opt *QueryOptimizer) estimateSelectivity(index *Index, predicates []QueryC
 	return selectivity
 }
 
-func (opt *QueryOptimizer) estimateQueryConditionSelectivity(predicate QueryCondition, columnStats *ColumnStats) float64 {
+func (opt *QueryOptimizer) estimateQueryConditionSelectivity(predicate QueryCondition, columnStats *FieldStats) float64 {
 	if columnStats == nil {
 		return 0.1 // Default selectivity if no stats
 	}
@@ -375,8 +375,8 @@ func (ir *IndexRegistry) GetIndexesForTable(table string) []*Index {
 	return []*Index{}
 }
 
-func (i *Index) CoversColumn(column string) bool {
-	for _, col := range i.Columns {
+func (i *Index) CoversField(column string) bool {
+	for _, col := range i.Fields {
 		if col == column {
 			return true
 		}
@@ -392,15 +392,15 @@ func (s *Statistics) GetTableStats(table string) *TableStats {
 	}
 	return &TableStats{
 		RowCount:    1000, // Default estimate
-		ColumnStats: make(map[string]*ColumnStats),
+		FieldStats: make(map[string]*FieldStats),
 	}
 }
 
-func (ts *TableStats) GetColumnStats(column string) *ColumnStats {
-	if stats, exists := ts.ColumnStats[column]; exists {
+func (ts *TableStats) GetFieldStats(column string) *FieldStats {
+	if stats, exists := ts.FieldStats[column]; exists {
 		return stats
 	}
-	return &ColumnStats{
+	return &FieldStats{
 		DistinctValues: 100, // Default estimate
 		NullCount:      0,
 	}

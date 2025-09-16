@@ -1,23 +1,19 @@
 package query
 
-// Common types for query package
-type Condition struct {
-	Field    string
-	Operator string
-	Value    interface{}
+// OCXQuery represents an OCX-QL query
+type OCXQuery struct {
+	Type       string            `json:"type"`
+	Table      string            `json:"table"`
+	Fields     []string          `json:"fields"`
+	Conditions []QueryCondition  `json:"conditions"`
+	OrderBy    string            `json:"order_by"`
+	OrderDesc  bool              `json:"order_desc"`
+	Limit      int               `json:"limit"`
 }
 
-type Predicate struct {
-	Column   string
-	Operator string
-	Value    interface{}
-}
-
-// Convert Predicate to Condition
-func (p Predicate) ToCondition() Condition {
-	return Condition{
-		Field:    p.Column,
-		Operator: p.Operator,
-		Value:    p.Value,
-	}
+// QueryCondition represents a query condition
+type QueryCondition struct {
+	Field    string      `json:"field"`
+	Operator string      `json:"operator"`
+	Value    interface{} `json:"value"`
 }

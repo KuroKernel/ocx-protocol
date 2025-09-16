@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ocx/protocol/store"
+	"ocx.local/store"
 )
 
 type Gateway struct {

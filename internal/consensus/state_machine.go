@@ -19,8 +19,8 @@ type OCXStateMachine struct {
 type OCXApplication struct {
 	state        *OCXState
 	validators   *ValidatorSet
-	reputation   *ReputationEngine
-	settlement   *SettlementEngine
+	// reputation   *ReputationEngine
+	// settlement   *SettlementEngine
 }
 
 // OCXState represents the current state of the OCX protocol

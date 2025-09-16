@@ -45,8 +45,8 @@ type Index struct {
 	Selectivity float64
 }
 
-// Predicate represents a WHERE condition for optimization
-type Predicate struct {
+// QueryCondition represents a WHERE condition for optimization
+type QueryCondition struct {
 	Column   string
 	Operator string
 	Value    interface{}
@@ -62,11 +62,11 @@ func NewQueryOptimizer(statistics *Statistics, indexRegistry *IndexRegistry) *Qu
 
 // OptimizeSelectQuery optimizes SELECT queries
 func (opt *QueryOptimizer) OptimizeSelectQuery(ctx context.Context, query *Query) (*QueryPlan, error) {
-	// 1. Predicate pushdown
-	predicates := opt.extractPredicates(query.Where)
+	// 1. QueryCondition pushdown
+	predicates := opt.extractQueryConditions(query.Where)
 	
 	// 2. Index selection based on predicates
-	bestIndex := opt.selectBestIndex(query.From, predicates)
+	// bestIndex := opt.selectBestIndex(query.From, predicates)
 	
 	// 3. Cost estimation for different join orders
 	joinPlans := opt.generateJoinPlans(query.From, predicates)
@@ -87,7 +87,7 @@ func (opt *QueryOptimizer) OptimizeComputeQuery(ctx context.Context, query *Quer
 			Operation: IndexScan,
 			Table:     "compute_units",
 			IndexHint: "idx_compute_units_region",
-			Predicate: &Predicate{
+			QueryCondition: &QueryCondition{
 				Column:   "geographic_region",
 				Operator: "IN",
 				Value:    regions,
@@ -101,7 +101,7 @@ func (opt *QueryOptimizer) OptimizeComputeQuery(ctx context.Context, query *Quer
 			Operation: IndexScan,
 			Table:     "compute_units",
 			IndexHint: "idx_compute_units_hardware",
-			Predicate: &Predicate{
+			QueryCondition: &QueryCondition{
 				Column:   "hardware_type",
 				Operator: "=",
 				Value:    hardwareType,
@@ -113,7 +113,7 @@ func (opt *QueryOptimizer) OptimizeComputeQuery(ctx context.Context, query *Quer
 	plan.Steps = append(plan.Steps, ExecutionStep{
 		Operation: SequentialScan, // Availability changes too fast for indexes
 		Table:     "compute_units",
-		Predicate: &Predicate{
+		QueryCondition: &QueryCondition{
 			Column:   "current_availability",
 			Operator: "=",
 			Value:    "available",
@@ -136,7 +136,7 @@ func (opt *QueryOptimizer) OptimizeComputeQuery(ctx context.Context, query *Quer
 		plan.Steps = append(plan.Steps, ExecutionStep{
 			Operation: HashJoin,
 			Table:     "provider_reputation_cache",
-			Predicate: &Predicate{
+			QueryCondition: &QueryCondition{
 				Column:   "overall_score",
 				Operator: ">=",
 				Value:    minReputation,
@@ -160,14 +160,14 @@ func (opt *QueryOptimizer) OptimizeComputeQuery(ctx context.Context, query *Quer
 
 // Helper methods for query optimization
 
-func (opt *QueryOptimizer) extractPredicates(where *WhereClause) []Predicate {
+func (opt *QueryOptimizer) extractQueryConditions(where *WhereClause) []QueryCondition {
 	if where == nil {
 		return nil
 	}
 	
-	predicates := make([]Predicate, len(where.Conditions))
-	for i, condition := range where.Conditions {
-		predicates[i] = Predicate{
+	predicates := make([]QueryCondition, len(where.QueryConditions))
+	for i, condition := range where.QueryConditions {
+		predicates[i] = QueryCondition{
 			Column:   condition.Field,
 			Operator: condition.Operator,
 			Value:    condition.Value,
@@ -177,24 +177,24 @@ func (opt *QueryOptimizer) extractPredicates(where *WhereClause) []Predicate {
 	return predicates
 }
 
-func (opt *QueryOptimizer) selectBestIndex(table string, predicates []Predicate) *Index {
+func (opt *QueryOptimizer) selectBestIndex(table string, predicates []QueryCondition) *Index {
 	availableIndexes := opt.indexRegistry.GetIndexesForTable(table)
 	
-	bestIndex := &Index{}
+	// // bestIndex := // // bestIndex := // bestIndex := &Index{}Index{}Index{}
 	bestSelectivity := 1.0
 	
 	for _, index := range availableIndexes {
 		selectivity := opt.estimateSelectivity(index, predicates)
 		if selectivity < bestSelectivity {
 			bestSelectivity = selectivity
-			bestIndex = index
+			// bestIndex = index
 		}
 	}
 	
-	return bestIndex
+	return // bestIndex
 }
 
-func (opt *QueryOptimizer) estimateSelectivity(index *Index, predicates []Predicate) float64 {
+func (opt *QueryOptimizer) estimateSelectivity(index *Index, predicates []QueryCondition) float64 {
 	stats := opt.statisticsStore.GetTableStats(index.Table)
 	
 	// For compound indexes, estimate combined selectivity
@@ -202,7 +202,7 @@ func (opt *QueryOptimizer) estimateSelectivity(index *Index, predicates []Predic
 	for _, predicate := range predicates {
 		if index.CoversColumn(predicate.Column) {
 			columnStats := stats.GetColumnStats(predicate.Column)
-			predicateSelectivity := opt.estimatePredicateSelectivity(predicate, columnStats)
+			predicateSelectivity := opt.estimateQueryConditionSelectivity(predicate, columnStats)
 			selectivity *= predicateSelectivity
 		}
 	}
@@ -210,7 +210,7 @@ func (opt *QueryOptimizer) estimateSelectivity(index *Index, predicates []Predic
 	return selectivity
 }
 
-func (opt *QueryOptimizer) estimatePredicateSelectivity(predicate Predicate, columnStats *ColumnStats) float64 {
+func (opt *QueryOptimizer) estimateQueryConditionSelectivity(predicate QueryCondition, columnStats *ColumnStats) float64 {
 	if columnStats == nil {
 		return 0.1 // Default selectivity if no stats
 	}
@@ -239,7 +239,7 @@ func (opt *QueryOptimizer) estimatePredicateSelectivity(predicate Predicate, col
 	}
 }
 
-func (opt *QueryOptimizer) generateJoinPlans(table string, predicates []Predicate) []*QueryPlan {
+func (opt *QueryOptimizer) generateJoinPlans(table string, predicates []QueryCondition) []*QueryPlan {
 	// Simplified join plan generation
 	// In a real implementation, this would consider multiple join orders
 	plans := []*QueryPlan{}
@@ -250,7 +250,7 @@ func (opt *QueryOptimizer) generateJoinPlans(table string, predicates []Predicat
 			{
 				Operation: IndexScan,
 				Table:     table,
-				Predicate: &predicates[0],
+				QueryCondition: &predicates[0],
 			},
 		},
 	}

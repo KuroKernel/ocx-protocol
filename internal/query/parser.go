@@ -66,10 +66,10 @@ type TimeRange struct {
 
 // WHERE clause components
 type WhereClause struct {
-	Conditions []Condition
+	QueryConditions []QueryCondition
 }
 
-type Condition struct {
+type QueryQueryCondition struct {
 	Field    string
 	Operator string
 	Value    interface{}
@@ -96,7 +96,7 @@ type ExecutionStep struct {
 	Operation StepType
 	Table     string
 	IndexHint string
-	Predicate *Condition
+	Predicate *QueryCondition
 	Limit     int
 }
 
@@ -369,7 +369,7 @@ func (p *Parser) parseReserveOptions() (map[string]interface{}, error) {
 }
 
 func (p *Parser) parseWhereClause() (*WhereClause, error) {
-	conditions := []Condition{}
+	conditions := []QueryCondition{}
 	
 	for {
 		field := p.parseIdentifier()
@@ -384,7 +384,7 @@ func (p *Parser) parseWhereClause() (*WhereClause, error) {
 		
 		value := p.parseValue()
 		
-		conditions = append(conditions, Condition{
+		conditions = append(conditions, QueryCondition{
 			Field:    field,
 			Operator: operator,
 			Value:    value,
@@ -400,7 +400,7 @@ func (p *Parser) parseWhereClause() (*WhereClause, error) {
 		}
 	}
 	
-	return &WhereClause{Conditions: conditions}, nil
+	return &WhereClause{QueryConditions: conditions}, nil
 }
 
 func (p *Parser) parseOrderByClause() (*OrderByClause, error) {

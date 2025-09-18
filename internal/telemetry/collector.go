@@ -497,20 +497,20 @@ func (tc *TelemetryCollector) getSessionMetrics(sessionID string) ([]*MetricsSna
 // System helper functions (simplified implementations)
 func (tc *TelemetryCollector) getCPUUtilization() (int, error) {
 	// Implementation would use /proc/stat or similar
-	return 45, nil // Placeholder
+	return tc.getRealCPUUsage()
 }
 
 func (tc *TelemetryCollector) getMemoryUsage() (float64, float64, error) {
 	// Implementation would use /proc/meminfo
-	return 8.5, 16.0, nil // Placeholder: 8.5GB used out of 16GB
+	return tc.getRealMemoryUsage()
 }
 
 func (tc *TelemetryCollector) getDiskIO() (float64, float64, error) {
 	// Implementation would use /proc/diskstats
-	return 125.5, 89.2, nil // Placeholder: read/write MB/s
+	return tc.getRealDiskIO()
 }
 
 func (tc *TelemetryCollector) getNetworkIO() (float64, float64, error) {
 	// Implementation would use /proc/net/dev
-	return 45.8, 23.1, nil // Placeholder: rx/tx MB/s
+	return tc.getRealNetworkIO()
 }

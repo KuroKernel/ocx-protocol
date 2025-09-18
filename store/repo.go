@@ -298,3 +298,93 @@ type Lease struct {
 	EndAt        *time.Time `json:"end_at,omitempty"`
 	State        string     `json:"state"`
 }
+
+// GetOffers retrieves all offers
+func (r *Repository) GetOffers() ([]Offer, error) {
+	rows, err := r.db.Query("SELECT offer_id, provider_id, fleet_id, unit, unit_price_amount, unit_price_currency, unit_price_scale, min_hours, max_hours, min_gpus, max_gpus, valid_from, valid_to FROM offers")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var offers []Offer
+	for rows.Next() {
+		var offer Offer
+		err := rows.Scan(&offer.OfferID, &offer.ProviderID, &offer.FleetID, &offer.Unit, &offer.UnitPriceAmount, &offer.UnitPriceCurrency, &offer.UnitPriceScale, &offer.MinHours, &offer.MaxHours, &offer.MinGPUs, &offer.MaxGPUs, &offer.ValidFrom, &offer.ValidTo)
+		if err != nil {
+			return nil, err
+		}
+		offers = append(offers, offer)
+	}
+
+	return offers, nil
+}
+
+// GetOrders retrieves all orders
+func (r *Repository) GetOrders() ([]Order, error) {
+	rows, err := r.db.Query("SELECT order_id, buyer_id, offer_id, requested_gpus, hours, budget_amount, budget_currency, budget_scale, state, created_at, updated_at FROM orders")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []Order
+	for rows.Next() {
+		var order Order
+		err := rows.Scan(&order.OrderID, &order.BuyerID, &order.OfferID, &order.RequestedGPUs, &order.Hours, &order.BudgetAmount, &order.BudgetCurrency, &order.BudgetScale, &order.State, &order.CreatedAt, &order.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+
+	return orders, nil
+}
+
+// GetLeases retrieves all leases
+func (r *Repository) GetLeases() ([]Lease, error) {
+	rows, err := r.db.Query("SELECT lease_id, order_id, fleet_id, assigned_gpus, start_at, end_at, state FROM leases")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var leases []Lease
+	for rows.Next() {
+		var lease Lease
+		var endAt sql.NullString
+		err := rows.Scan(&lease.LeaseID, &lease.OrderID, &lease.FleetID, &lease.AssignedGPUs, &lease.StartAt, &endAt, &lease.State)
+		if err != nil {
+			return nil, err
+		}
+		if endAt.Valid {
+			if t, err := time.Parse(time.RFC3339, endAt.String); err == nil {
+				lease.EndAt = &t
+			}
+		}
+		leases = append(leases, lease)
+	}
+
+	return leases, nil
+}
+
+// GetParties retrieves all parties
+func (r *Repository) GetParties() ([]Identity, error) {
+	rows, err := r.db.Query("SELECT party_id, role, display_name, email, key_id, public_key, created_at FROM identities")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var parties []Identity
+	for rows.Next() {
+		var party Identity
+		err := rows.Scan(&party.PartyID, &party.Role, &party.DisplayName, &party.Email, &party.KeyID, &party.PublicKey, &party.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		parties = append(parties, party)
+	}
+
+	return parties, nil
+}

@@ -69,18 +69,17 @@ func (sv *SafetyValidator) checkFunctionLengths(node ast.Node, result *Validatio
 
 // getFunctionLineCount calculates the number of lines in a function
 func (sv *SafetyValidator) getFunctionLineCount(fn *ast.FuncDecl) int {
-	// Placeholder implementation - would need to count actual lines
-	return 0
+	return sv.getRealFunctionLineCount(fn)
 }
 
-// checkUnsafeLoops checks for loops without hard limits (placeholder)
+// checkUnsafeLoops checks for loops without hard limits
 func (sv *SafetyValidator) checkUnsafeLoops(node ast.Node, result *ValidationResult) {
-	// Placeholder implementation
+	sv.checkRealUnsafeLoops(node, result)
 }
 
-// checkUnhandledErrors checks for unhandled errors (placeholder)
+// checkUnhandledErrors checks for unhandled errors
 func (sv *SafetyValidator) checkUnhandledErrors(node ast.Node, result *ValidationResult) {
-	// Placeholder implementation
+	sv.checkRealUnhandledErrors(node, result)
 }
 
 // NewSafetyReport creates a new safety report

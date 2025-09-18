@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCX Protocol - Compute Treasury Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #fafafa;
+            color: #1a1a1a;
+            line-height: 1.4;
+        }
+        
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        
+        .header {
+            margin-bottom: 32px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e5e5e5;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .nav-link {
+            display: inline-block;
+            margin-top: 16px;
+            padding: 8px 16px;
+            background: #1a1a1a;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        
+        .nav-link:hover {
+            background: #333;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        
+        .metric-card {
+            background: white;
+            border: 1px solid #e5e5e5;
+            border-radius: 4px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .metric-change {
+            font-size: 11px;
+            margin-top: 4px;
+        }
+        
+        .positive { color: #059669; }
+        .negative { color: #dc2626; }
+        .neutral { color: #666; }
+        
+        .charts-section {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        
+        .chart-container {
+            background: white;
+            border: 1px solid #e5e5e5;
+            border-radius: 4px;
+            padding: 24px;
+        }
+        
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #1a1a1a;
+        }
+        
+        .chart-canvas {
+            max-height: 300px;
+        }
+        
+        .table-section {
+            margin-bottom: 32px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1a1a1a;
+        }
+        
+        .data-table {
+            background: white;
+            border: 1px solid #e5e5e5;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        
+        th {
+            background: #f9f9f9;
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        td {
+            font-size: 14px;
+            color: #1a1a1a;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status.active {
+            background: #dcfce7;
+            color: #059669;
+        }
+        
+        .status.settled {
+            background: #e0f2fe;
+            color: #0284c7;
+        }
+        
+        .status.disputed {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        
+        .amount {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 13px;
+        }
+        
+        .filters {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            align-items: center;
+        }
+        
+        .filter-select {
+            padding: 6px 12px;
+            border: 1px solid #e5e5e5;
+            border-radius: 4px;
+            background: white;
+            font-size: 13px;
+            color: #1a1a1a;
+        }
+        
+        .export-btn {
+            margin-left: auto;
+            padding: 6px 16px;
+            background: #1a1a1a;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .export-btn:hover {
+            background: #333;
+        }
+        
+        .sla-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        
+        .sla-card {
+            background: white;
+            border: 1px solid #e5e5e5;
+            border-radius: 4px;
+            padding: 16px;
+        }
+        
+        .sla-metric {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        
+        .sla-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        
+        .sla-bar {
+            width: 100%;
+            height: 4px;
+            background: #f5f5f5;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .sla-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+        
+        @media (max-width: 768px) {
+            .charts-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .export-btn {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>Compute Treasury Dashboard</h1>
+            <p>Financial oversight and performance metrics for OCX Protocol compute spending</p>
+            <a href="index.html" class="nav-link">← Back to OCX Protocol</a>
+        </div>
+        
+        <!-- Key Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">$127,439</div>
+                <div class="metric-label">Total Spend (30d)</div>
+                <div class="metric-change positive">+12.3% vs prior period</div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-value">$34,200</div>
+                <div class="metric-label">Active Escrow</div>
+                <div class="metric-change neutral">14 active sessions</div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-value">99.4%</div>
+                <div class="metric-label">SLA Compliance</div>
+                <div class="metric-change positive">+0.2% vs target</div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-value">$3,186</div>
+                <div class="metric-label">Protocol Fees</div>
+                <div class="metric-change positive">2.5% of volume</div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-value">47%</div>
+                <div class="metric-label">Cost Savings</div>
+                <div class="metric-change positive">vs cloud baseline</div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-value">$89,234</div>
+                <div class="metric-label">30d Forecast</div>
+                <div class="metric-change neutral">Based on trends</div>
+            </div>
+        </div>
+        
+        <!-- Charts Section -->
+        <div class="charts-section">
+            <div class="chart-container">
+                <div class="chart-title">Compute Spending Trend</div>
+                <canvas id="spendChart" class="chart-canvas"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">Spend by Provider</div>
+                <canvas id="providerChart" class="chart-canvas"></canvas>
+            </div>
+        </div>
+        
+        <!-- SLA Compliance -->
+        <div class="table-section">
+            <div class="section-title">SLA Performance</div>
+            <div class="sla-grid">
+                <div class="sla-card">
+                    <div class="sla-metric positive">99.4%</div>
+                    <div class="sla-label">Uptime (Target: 99.0%)</div>
+                    <div class="sla-bar">
+                        <div class="sla-fill positive" style="width: 99.4%; background: #059669;"></div>
+                    </div>
+                </div>
+                
+                <div class="sla-card">
+                    <div class="sla-metric positive">87ms</div>
+                    <div class="sla-label">Avg Latency (Target: <100ms)</div>
+                    <div class="sla-bar">
+                        <div class="sla-fill positive" style="width: 87%; background: #059669;"></div>
+                    </div>
+                </div>
+                
+                <div class="sla-card">
+                    <div class="sla-metric positive">2.1%</div>
+                    <div class="sla-label">Failure Rate (Target: <5%)</div>
+                    <div class="sla-bar">
+                        <div class="sla-fill positive" style="width: 2.1%; background: #059669;"></div>
+                    </div>
+                </div>
+                
+                <div class="sla-card">
+                    <div class="sla-metric positive">3</div>
+                    <div class="sla-label">Open Disputes</div>
+                    <div class="sla-bar">
+                        <div class="sla-fill neutral" style="width: 12%; background: #666;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settlement Ledger -->
+        <div class="table-section">
+            <div class="section-title">Recent Settlements</div>
+            <div class="filters">
+                <select class="filter-select">
+                    <option>Last 7 days</option>
+                    <option>Last 30 days</option>
+                    <option>Last 90 days</option>
+                </select>
+                <select class="filter-select">
+                    <option>All providers</option>
+                    <option>Lambda Labs</option>
+                    <option>Genesis Cloud</option>
+                    <option>RunPod</option>
+                </select>
+                <select class="filter-select">
+                    <option>All statuses</option>
+                    <option>Active</option>
+                    <option>Settled</option>
+                    <option>Disputed</option>
+                </select>
+                <button class="export-btn">Export CSV</button>
+            </div>
+            
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Transaction ID</th>
+                            <th>Provider</th>
+                            <th>Resource Type</th>
+                            <th>Duration</th>
+                            <th>Amount</th>
+                            <th>Protocol Fee</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>TXN-2025-001847</td>
+                            <td>Lambda Labs</td>
+                            <td>8x H100 SXM5</td>
+                            <td>4.2h</td>
+                            <td class="amount">$2,847.50</td>
+                            <td class="amount">$71.19</td>
+                            <td><span class="status settled">Settled</span></td>
+                            <td>Jan 15, 2025</td>
+                        </tr>
+                        <tr>
+                            <td>TXN-2025-001846</td>
+                            <td>Genesis Cloud</td>
+                            <td>4x A100 80GB</td>
+                            <td>12.1h</td>
+                            <td class="amount">$1,234.80</td>
+                            <td class="amount">$30.87</td>
+                            <td><span class="status active">Active</span></td>
+                            <td>Jan 15, 2025</td>
+                        </tr>
+                        <tr>
+                            <td>TXN-2025-001845</td>
+                            <td>RunPod</td>
+                            <td>2x RTX 4090</td>
+                            <td>6.7h</td>
+                            <td class="amount">$89.60</td>
+                            <td class="amount">$2.24</td>
+                            <td><span class="status settled">Settled</span></td>
+                            <td>Jan 14, 2025</td>
+                        </tr>
+                        <tr>
+                            <td>TXN-2025-001844</td>
+                            <td>Vast.ai Provider</td>
+                            <td>16x H100 SXM5</td>
+                            <td>2.3h</td>
+                            <td class="amount">$4,567.20</td>
+                            <td class="amount">$114.18</td>
+                            <td><span class="status disputed">Disputed</span></td>
+                            <td>Jan 14, 2025</td>
+                        </tr>
+                        <tr>
+                            <td>TXN-2025-001843</td>
+                            <td>Lambda Labs</td>
+                            <td>1x H100 SXM5</td>
+                            <td>24.0h</td>
+                            <td class="amount">$720.00</td>
+                            <td class="amount">$18.00</td>
+                            <td><span class="status settled">Settled</span></td>
+                            <td>Jan 13, 2025</td>
+                        </tr>
+                        <tr>
+                            <td>TXN-2025-001842</td>
+                            <td>Genesis Cloud</td>
+                            <td>8x A100 80GB</td>
+                            <td>8.5h</td>
+                            <td class="amount">$3,128.75</td>
+                            <td class="amount">$78.22</td>
+                            <td><span class="status settled">Settled</span></td>
+                            <td>Jan 13, 2025</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Spending Trend Chart
+        const spendCtx = document.getElementById('spendChart').getContext('2d');
+        new Chart(spendCtx, {
+            type: 'line',
+            data: {
+                labels: ['Jan 1', 'Jan 5', 'Jan 10', 'Jan 15'],
+                datasets: [{
+                    label: 'Daily Spend ($)',
+                    data: [3200, 4100, 2800, 5200],
+                    borderColor: '#1a1a1a',
+                    backgroundColor: 'rgba(26, 26, 26, 0.05)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+        
+        // Provider Distribution Chart
+        const providerCtx = document.getElementById('providerChart').getContext('2d');
+        new Chart(providerCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Lambda Labs', 'Genesis Cloud', 'RunPod', 'Others'],
+                datasets: [{
+                    data: [45, 28, 18, 9],
+                    backgroundColor: ['#1a1a1a', '#404040', '#666666', '#999999'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Export functionality
+        document.querySelector('.export-btn').addEventListener('click', function() {
+            // This would integrate with your backend to export CSV
+            alert('CSV export functionality would connect to your OCX Protocol API');
+        });
+    </script>
+</body>
+</html>

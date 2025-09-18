@@ -15,7 +15,7 @@ import (
 )
 
 // Import the OCX types (assuming they're in the same package for this demo)
-// In production, these would be imported from github.com/ocx/protocol/pkg/ocx
+// In production, these would be imported from ocx.local/pkg/ocx
 
 type EnhancedOCXClient struct {
 	baseURL    string

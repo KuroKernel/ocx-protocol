@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ocx/protocol/pkg/ocx"
+	"ocx.local/pkg/ocx"
 )
 
 const (

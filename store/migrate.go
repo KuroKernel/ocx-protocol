@@ -86,98 +86,106 @@ var Migrations = []Migration{
 		Version: 5,
 		Name:    "create_meters_table",
 		SQL: `CREATE TABLE IF NOT EXISTS meters(
-			record_id TEXT PRIMARY KEY,
+			meter_id TEXT PRIMARY KEY,
 			lease_id TEXT NOT NULL,
+			metric_name TEXT NOT NULL,
+			value REAL NOT NULL,
 			timestamp TEXT NOT NULL,
-			gpu_hours INTEGER NOT NULL,
-			egress_gb INTEGER NOT NULL,
-			cpu_hours INTEGER NOT NULL,
-			notes TEXT
+			FOREIGN KEY (lease_id) REFERENCES leases(lease_id)
 		);`,
 	},
 	{
 		Version: 6,
-		Name:    "create_invoices_table",
-		SQL: `CREATE TABLE IF NOT EXISTS invoices(
-			invoice_id TEXT PRIMARY KEY,
+		Name:    "create_receipts_table",
+		SQL: `CREATE TABLE IF NOT EXISTS receipts(
+			receipt_hash BLOB PRIMARY KEY,
+			receipt_body BLOB NOT NULL,
 			lease_id TEXT NOT NULL,
-			issuer_id TEXT NOT NULL,
-			recipient_id TEXT NOT NULL,
-			total_amount TEXT NOT NULL,
-			total_currency TEXT NOT NULL,
-			total_scale INTEGER NOT NULL,
-			state TEXT NOT NULL,
-			issued_at TEXT NOT NULL,
-			due_at TEXT NOT NULL
+			artifact_hash BLOB NOT NULL,
+			input_hash BLOB NOT NULL,
+			cycles_used INTEGER NOT NULL,
+			price_micro_units INTEGER NOT NULL,
+			created_at TEXT NOT NULL DEFAULT (datetime('now')),
+			FOREIGN KEY (lease_id) REFERENCES leases(lease_id)
 		);`,
 	},
 	{
 		Version: 7,
-		Name:    "create_migrations_table",
-		SQL: `CREATE TABLE IF NOT EXISTS migrations(
-			version INTEGER PRIMARY KEY,
-			name TEXT NOT NULL,
-			applied_at TEXT NOT NULL
-		);`,
+		Name:    "create_receipts_indexes",
+		SQL: `CREATE INDEX IF NOT EXISTS idx_receipts_lease ON receipts(lease_id);
+		CREATE INDEX IF NOT EXISTS idx_receipts_artifact ON receipts(artifact_hash);
+		CREATE INDEX IF NOT EXISTS idx_receipts_created ON receipts(created_at);`,
 	},
 }
 
 // RunMigrations runs all pending migrations
 func RunMigrations(db *sql.DB) error {
 	// Create migrations table if it doesn't exist
-	if _, err := db.Exec(Migrations[6].SQL); err != nil {
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version INTEGER PRIMARY KEY,
+			name TEXT NOT NULL,
+			applied_at TEXT NOT NULL
+		)
+	`)
+	if err != nil {
 		return fmt.Errorf("failed to create migrations table: %w", err)
 	}
 
-	// Get current version
-	var currentVersion int
-	err := db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM migrations").Scan(&currentVersion)
+	// Get applied migrations
+	appliedVersions := make(map[int]bool)
+	rows, err := db.Query("SELECT version FROM schema_migrations")
 	if err != nil {
-		return fmt.Errorf("failed to get current migration version: %w", err)
+		return fmt.Errorf("failed to query applied migrations: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var version int
+		if err := rows.Scan(&version); err != nil {
+			return fmt.Errorf("failed to scan migration version: %w", err)
+		}
+		appliedVersions[version] = true
 	}
 
-	// Run pending migrations
+	// Apply pending migrations
 	for _, migration := range Migrations {
-		if migration.Version > currentVersion {
-			log.Printf("Running migration %d: %s", migration.Version, migration.Name)
+		if !appliedVersions[migration.Version] {
+			log.Printf("Applying migration %d: %s", migration.Version, migration.Name)
 			
-			if _, err := db.Exec(migration.SQL); err != nil {
-				return fmt.Errorf("failed to run migration %d: %w", migration.Version, err)
+			_, err := db.Exec(migration.SQL)
+			if err != nil {
+				return fmt.Errorf("failed to apply migration %d (%s): %w", 
+					migration.Version, migration.Name, err)
 			}
 
-			// Record migration
-			_, err = db.Exec("INSERT INTO migrations (version, name, applied_at) VALUES (?, ?, datetime('now'))",
-				migration.Version, migration.Name)
+			// Record migration as applied
+			_, err = db.Exec(`
+				INSERT INTO schema_migrations (version, name, applied_at) 
+				VALUES (?, ?, datetime('now'))
+			`, migration.Version, migration.Name)
 			if err != nil {
 				return fmt.Errorf("failed to record migration %d: %w", migration.Version, err)
 			}
-
-			log.Printf("Migration %d completed successfully", migration.Version)
 		}
 	}
 
 	return nil
 }
 
-// GetDatabasePath returns the database path from environment
+// GetDatabasePath returns the database file path
 func GetDatabasePath() string {
-	dbPath := os.Getenv("OCX_DB")
-	if dbPath == "" {
-		dbPath = "sqlite:///ocx.db"
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = "."
 	}
-	
-	// Extract path from sqlite:///path
-	if len(dbPath) > 10 && dbPath[:10] == "sqlite:///" {
-		return dbPath[10:]
-	}
-	
-	return "ocx.db"
+	return filepath.Join(homeDir, ".ocx", "gateway.db")
 }
 
 // EnsureDatabaseDir ensures the database directory exists
 func EnsureDatabaseDir(dbPath string) error {
 	dir := filepath.Dir(dbPath)
-	if dir != "." {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return os.MkdirAll(dir, 0755)
 	}
 	return nil

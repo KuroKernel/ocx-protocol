@@ -1,6 +1,7 @@
-[OCX-CORE] 2025/09/18 17:16:40 main.go:134: 🚀 OCX Core Server starting on port 8086
-[OCX-CORE] 2025/09/18 17:16:40 main.go:135: 📖 API Documentation: http://localhost:8086/api
-[OCX-CORE] 2025/09/18 17:16:40 main.go:136: 💓 Health Check: http://localhost:8086/health
-[OCX-CORE] 2025/09/18 17:16:40 main.go:137: 🖥️  GPU Testing: ./scripts/test_rtx5060.sh quick
-[OCX-CORE] 2025/09/18 17:17:04 main.go:148: 🛑 Shutting down server...
-[OCX-CORE] 2025/09/18 17:17:04 main.go:158: ✅ Server stopped
+2025/09/19 01:50:42 🚀 Starting Test Server on port 9000...
+2025/09/19 01:50:42 🌐 Starting server on port 9000
+2025/09/19 01:50:42 🏥 Health check: http://localhost:9000/health
+2025/09/19 01:50:48 🏥 Health check from 127.0.0.1:51320
+2025/09/19 01:50:52 ⚡ API Execute request from [::1]:39132
+2025/09/19 01:50:56 🔍 API Verify request from [::1]:39138
+2025/09/19 01:53:14 🛑 Shutting down server...

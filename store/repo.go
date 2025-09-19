@@ -221,7 +221,7 @@ func (r *Repository) GetLease(leaseID string) (*Lease, error) {
 func (r *Repository) ListLeases() ([]*Lease, error) {
 	rows, err := r.db.Query(`
 		SELECT lease_id, order_id, fleet_id, assigned_gpus, start_at, end_at, state
-		FROM leases ORDER BY created_at DESC
+		FROM leases ORDER BY start_at DESC
 	`)
 	if err != nil {
 		return nil, err
@@ -387,4 +387,210 @@ func (r *Repository) GetParties() ([]Identity, error) {
 	}
 
 	return parties, nil
+}
+
+// Receipt represents a cryptographic receipt for deterministic execution
+type Receipt struct {
+	ReceiptHash      []byte    `json:"receipt_hash"`
+	ReceiptBody      []byte    `json:"receipt_body"`
+	LeaseID          string    `json:"lease_id"`
+	ArtifactHash     []byte    `json:"artifact_hash"`
+	InputHash        []byte    `json:"input_hash"`
+	CyclesUsed       int64     `json:"cycles_used"`
+	PriceMicroUnits  int64     `json:"price_micro_units"`
+	CreatedAt        string    `json:"created_at"`
+}
+
+// ReceiptQuery represents query parameters for filtering receipts
+type ReceiptQuery struct {
+	LeaseID      string `json:"lease_id,omitempty"`
+	ArtifactHash []byte `json:"artifact_hash,omitempty"`
+	StartDate    string `json:"start_date,omitempty"`
+	EndDate      string `json:"end_date,omitempty"`
+	Limit        int    `json:"limit,omitempty"`
+	Offset       int    `json:"offset,omitempty"`
+}
+
+// Receipt operations
+func (r *Repository) StoreReceipt(receipt *Receipt) error {
+	_, err := r.db.Exec(`
+		INSERT INTO receipts (receipt_hash, receipt_body, lease_id, artifact_hash, input_hash, cycles_used, price_micro_units, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, receipt.ReceiptHash, receipt.ReceiptBody, receipt.LeaseID, receipt.ArtifactHash, 
+		receipt.InputHash, receipt.CyclesUsed, receipt.PriceMicroUnits, receipt.CreatedAt)
+	return err
+}
+
+func (r *Repository) GetReceiptByHash(hash []byte) (*Receipt, error) {
+	var receipt Receipt
+	err := r.db.QueryRow(`
+		SELECT receipt_hash, receipt_body, lease_id, artifact_hash, input_hash, cycles_used, price_micro_units, created_at
+		FROM receipts WHERE receipt_hash = ?
+	`, hash).Scan(&receipt.ReceiptHash, &receipt.ReceiptBody, &receipt.LeaseID, 
+		&receipt.ArtifactHash, &receipt.InputHash, &receipt.CyclesUsed, &receipt.PriceMicroUnits, &receipt.CreatedAt)
+	
+	if err != nil {
+		return nil, err
+	}
+	return &receipt, nil
+}
+
+func (r *Repository) QueryReceipts(query ReceiptQuery) ([]*Receipt, error) {
+	// Build dynamic query
+	sql := "SELECT receipt_hash, receipt_body, lease_id, artifact_hash, input_hash, cycles_used, price_micro_units, created_at FROM receipts WHERE 1=1"
+	args := []interface{}{}
+	
+	if query.LeaseID != "" {
+		sql += " AND lease_id = ?"
+		args = append(args, query.LeaseID)
+	}
+	
+	if len(query.ArtifactHash) > 0 {
+		sql += " AND artifact_hash = ?"
+		args = append(args, query.ArtifactHash)
+	}
+	
+	if query.StartDate != "" {
+		sql += " AND created_at >= ?"
+		args = append(args, query.StartDate)
+	}
+	
+	if query.EndDate != "" {
+		sql += " AND created_at <= ?"
+		args = append(args, query.EndDate)
+	}
+	
+	sql += " ORDER BY created_at DESC"
+	
+	if query.Limit > 0 {
+		sql += " LIMIT ?"
+		args = append(args, query.Limit)
+	}
+	
+	if query.Offset > 0 {
+		sql += " OFFSET ?"
+		args = append(args, query.Offset)
+	}
+	
+	rows, err := r.db.Query(sql, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var receipts []*Receipt
+	for rows.Next() {
+		var receipt Receipt
+		err := rows.Scan(&receipt.ReceiptHash, &receipt.ReceiptBody, &receipt.LeaseID,
+			&receipt.ArtifactHash, &receipt.InputHash, &receipt.CyclesUsed, &receipt.PriceMicroUnits, &receipt.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		receipts = append(receipts, &receipt)
+	}
+	
+	return receipts, nil
+}
+
+// GetLeaseByID retrieves a specific lease by ID
+func (r *Repository) GetLeaseByID(leaseID string) (*Lease, error) {
+	var lease Lease
+	var startAtStr, endAtStr string
+	err := r.db.QueryRow(`
+		SELECT lease_id, order_id, fleet_id, assigned_gpus, start_at, end_at, state
+		FROM leases WHERE lease_id = ?
+	`, leaseID).Scan(&lease.LeaseID, &lease.OrderID, &lease.FleetID, &lease.AssignedGPUs, &startAtStr, &endAtStr, &lease.State)
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	// Parse start_at
+	if startAt, err := time.Parse(time.RFC3339, startAtStr); err == nil {
+		lease.StartAt = startAt
+	}
+	
+	// Parse end_at if present
+	if endAtStr != "" {
+		if endAt, err := time.Parse(time.RFC3339, endAtStr); err == nil {
+			lease.EndAt = &endAt
+		}
+	}
+	
+	return &lease, nil
+}
+
+
+// ExecutionReceipt represents a cryptographic receipt for deterministic execution
+type ExecutionReceipt struct {
+	ID               int64  `json:"id"`
+	LeaseID          string `json:"lease_id"`
+	ArtifactHash     string `json:"artifact_hash"`
+	InputCommit      string `json:"input_commit"`
+	OutputHash       string `json:"output_hash"`
+	CyclesUsed       int64  `json:"cycles_used"`
+	TranscriptHash   string `json:"transcript_hash"`
+	PriceMicroUnits  int64  `json:"price_micro_units"`
+	ReceiptSignature string `json:"receipt_signature"`
+	CreatedAt        string `json:"created_at"`
+}
+
+// CreateExecutionReceipt stores a new execution receipt
+func (r *Repository) CreateExecutionReceipt(leaseID, artifactHash, inputCommit, outputHash string, cyclesUsed, priceMicroUnits int64, transcriptHash, receiptSignature string) error {
+	_, err := r.db.Exec(`
+		INSERT INTO execution_receipts (lease_id, artifact_hash, input_commit, output_hash, cycles_used, transcript_hash, price_micro_units, receipt_signature, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, leaseID, artifactHash, inputCommit, outputHash, cyclesUsed, transcriptHash, priceMicroUnits, receiptSignature, time.Now().Format(time.RFC3339))
+	return err
+}
+
+// GetExecutionReceipts retrieves all execution receipts for a lease
+func (r *Repository) GetExecutionReceipts(leaseID string) ([]ExecutionReceipt, error) {
+	rows, err := r.db.Query(`
+		SELECT id, lease_id, artifact_hash, input_commit, output_hash, cycles_used, transcript_hash, price_micro_units, receipt_signature, created_at
+		FROM execution_receipts
+		WHERE lease_id = ?
+		ORDER BY created_at DESC
+	`, leaseID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var receipts []ExecutionReceipt
+	for rows.Next() {
+		var receipt ExecutionReceipt
+		err := rows.Scan(&receipt.ID, &receipt.LeaseID, &receipt.ArtifactHash, &receipt.InputCommit, &receipt.OutputHash, &receipt.CyclesUsed, &receipt.TranscriptHash, &receipt.PriceMicroUnits, &receipt.ReceiptSignature, &receipt.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		receipts = append(receipts, receipt)
+	}
+
+	return receipts, nil
+}
+
+// GetAllExecutionReceipts retrieves all execution receipts
+func (r *Repository) GetAllExecutionReceipts() ([]ExecutionReceipt, error) {
+	rows, err := r.db.Query(`
+		SELECT id, lease_id, artifact_hash, input_commit, output_hash, cycles_used, transcript_hash, price_micro_units, receipt_signature, created_at
+		FROM execution_receipts
+		ORDER BY created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var receipts []ExecutionReceipt
+	for rows.Next() {
+		var receipt ExecutionReceipt
+		err := rows.Scan(&receipt.ID, &receipt.LeaseID, &receipt.ArtifactHash, &receipt.InputCommit, &receipt.OutputHash, &receipt.CyclesUsed, &receipt.TranscriptHash, &receipt.PriceMicroUnits, &receipt.ReceiptSignature, &receipt.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		receipts = append(receipts, receipt)
+	}
+
+	return receipts, nil
 }

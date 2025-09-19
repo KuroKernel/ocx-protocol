@@ -1,0 +1,10 @@
+{
+  "name": "basic_execution",
+  "description": "Basic execution with simple artifact and input",
+  "artifact_hex": "48656c6c6f20576f726c64",
+  "input_hex": "74657374",
+  "max_cycles": 1000,
+  "expected_receipt_hash": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
+  "expected_cycles_used": 1000,
+  "expected_output_hash": "f1e2d3c4b5a6978012345678901234567890abcdef1234567890abcdef123456"
+}

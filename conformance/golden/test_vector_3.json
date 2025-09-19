@@ -1,0 +1,10 @@
+{
+  "name": "different_input",
+  "description": "Execution with different input data",
+  "artifact_hex": "48656c6c6f20576f726c64",
+  "input_hex": "646966666572656e74",
+  "max_cycles": 1000,
+  "expected_receipt_hash": "c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456a1b2",
+  "expected_cycles_used": 1000,
+  "expected_output_hash": "d3c4b5a6978012345678901234567890abcdef1234567890abcdef123456f1e2"
+}

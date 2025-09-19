@@ -5,6 +5,12 @@ Production-ready testing framework for the Open Compute Exchange Protocol with r
 ## Quick Start
 
 ```bash
+# Run simple demo (recommended first)
+make simple-demo
+
+# Run killer applications demo
+make demo
+
 # Quick GPU verification
 ./scripts/test_rtx5060.sh quick
 
@@ -14,6 +20,18 @@ Production-ready testing framework for the Open Compute Exchange Protocol with r
 # Full end-to-end test (offer → order → provision → monitor → settle)
 ./scripts/test_rtx5060.sh full
 ```
+
+## Killer Applications
+
+OCX Protocol includes ready-to-run programs that demonstrate its power:
+
+1. **AlphaFold Protein Folding** - Simulates protein folding energy calculations
+2. **LLVM Compiler Testing** - Tests compiler optimization passes
+3. **Bitcoin Difficulty Adjustment** - Implements mining difficulty algorithms
+4. **Doom Physics Simulation** - Game engine physics with collision detection
+5. **WebGL Benchmark** - GPU shader compilation and performance testing
+
+Each program runs deterministically with cryptographic receipts, cycle-accurate metering, and verifiable results.
 
 ## Architecture
 

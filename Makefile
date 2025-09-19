@@ -16,6 +16,51 @@ build:
 	@echo "🔨 Building OCX Protocol..."
 	go build -v ./...
 
+# Build killer demo
+build-demo:
+	@echo "🚀 Building OCX Killer Demo..."
+	go build -o ocx-killer-demo ./cmd/ocx-killer-demo/
+
+# Run killer demo
+demo: build-demo
+	@echo "🎮 Running OCX Killer Applications Demo..."
+	./ocx-killer-demo
+
+# Build simple demo
+build-simple-demo:
+	@echo "🚀 Building OCX Simple Demo..."
+	go build -o ocx-simple-demo ./cmd/ocx-simple-demo/
+
+# Run simple demo
+simple-demo: build-simple-demo
+	@echo "🎮 Running OCX Simple Demo..."
+	./ocx-simple-demo
+
+# Build enhanced CLI
+build-cli:
+	@echo "🔧 Building OCX Enhanced CLI..."
+	go build -o ocx ./cmd/ocx/
+
+# Run conformance tests
+conformance: build-cli
+	@echo "🧪 Running OCX Conformance Tests..."
+	./ocx conformance
+
+# Run benchmarks
+benchmark: build-cli
+	@echo "⚡ Running OCX Benchmarks..."
+	./ocx benchmark
+
+# Generate test vectors (requires safety flag)
+gen-vectors: build-cli
+	@echo "🔧 Generating Conformance Test Vectors..."
+	ALLOW_VECTOR_REGEN=1 ./ocx gen-vectors
+
+# Verify receipts
+verify: build-cli
+	@echo "🔍 Verifying Receipts..."
+	./ocx verify $(ARGS)
+
 # Install development tools
 install-tools:
 	@echo "📦 Installing development tools..."
@@ -131,6 +176,15 @@ help:
 	@echo "Available targets:"
 	@echo "  all           - Run all checks and tests"
 	@echo "  build         - Build the project"
+	@echo "  build-demo    - Build killer applications demo"
+	@echo "  demo          - Run killer applications demo"
+	@echo "  build-simple-demo - Build simple demo"
+	@echo "  simple-demo   - Run simple demo"
+	@echo "  build-cli     - Build enhanced CLI"
+	@echo "  conformance   - Run conformance tests"
+	@echo "  benchmark     - Run performance benchmarks"
+	@echo "  gen-vectors   - Generate test vectors"
+	@echo "  verify        - Verify receipts"
 	@echo "  test          - Run tests"
 	@echo "  test-race     - Run tests with race detection"
 	@echo "  test-coverage - Run tests with coverage"

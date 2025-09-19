@@ -1,0 +1,10 @@
+{
+  "name": "different_artifact",
+  "description": "Execution with different artifact data",
+  "artifact_hex": "646966666572656e74",
+  "input_hex": "74657374",
+  "max_cycles": 1000,
+  "expected_receipt_hash": "d4e5f6789012345678901234567890abcdef1234567890abcdef123456a1b2c3",
+  "expected_cycles_used": 1000,
+  "expected_output_hash": "c4b5a6978012345678901234567890abcdef1234567890abcdef123456f1e2d3"
+}

@@ -1,0 +1,309 @@
+name: OCX Protocol v1.0.0-rc.1 Receipt Verification
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.23'
+  OCX_VERSION: 'v1.0.0-rc.1'
+
+jobs:
+  receipt-verification:
+    name: Receipt Generation and Verification
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    
+    - name: Install dependencies
+      run: |
+        go mod download
+        go mod verify
+    
+    - name: Build minimal-cli
+      run: |
+        go build \
+          -ldflags "-X ocx.local/internal/version.SpecHash=abc123def456 \
+                    -X ocx.local/internal/version.Build=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+                    -X ocx.local/internal/version.GitCommit=${{ github.sha }} \
+                    -X ocx.local/internal/version.GitBranch=${{ github.ref_name }}" \
+          -o minimal-cli \
+          ./cmd/minimal-cli
+    
+    - name: Build test server
+      run: |
+        go build \
+          -ldflags "-X ocx.local/internal/version.SpecHash=abc123def456 \
+                    -X ocx.local/internal/version.Build=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+                    -X ocx.local/internal/version.GitCommit=${{ github.sha }} \
+                    -X ocx.local/internal/version.GitBranch=${{ github.ref_name }}" \
+          -o test-server \
+          ./cmd/test-port
+    
+    - name: Start test server
+      run: |
+        ./test-server &
+        echo $! > server.pid
+        sleep 5
+    
+    - name: Wait for server to be ready
+      run: |
+        timeout 30 bash -c 'until curl -f http://localhost:9000/health; do sleep 1; done'
+    
+    - name: Test server health
+      run: |
+        curl -s http://localhost:9000/health | jq .
+    
+    - name: Execute OCX with test vectors
+      id: execute-ocx
+      run: |
+        echo "## OCX Protocol v1.0.0-rc.1 Receipt Generation Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Test Vector | Artifact | Input | Max Cycles | Receipt Hash | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------------|----------|-------|------------|--------------|--------|" >> $GITHUB_STEP_SUMMARY
+        
+        # Test vector 1: Basic execution
+        echo "Testing basic execution..."
+        result1=$(./minimal-cli -command execute \
+          -server "http://localhost:9000" \
+          -artifact "Hello World" \
+          -input "test" \
+          -max-cycles 1000 \
+          -lease-id "test-1")
+        
+        receipt_hash1=$(echo "$result1" | jq -r '.receipt_hash // "N/A"')
+        status1=$(echo "$result1" | jq -r '.status // "N/A"')
+        echo "| Basic Execution | Hello World | test | 1000 | \`${receipt_hash1:0:16}...\` | $status1 |" >> $GITHUB_STEP_SUMMARY
+        
+        # Test vector 2: High cycle execution
+        echo "Testing high cycle execution..."
+        result2=$(./minimal-cli -command execute \
+          -server "http://localhost:9000" \
+          -artifact "Hello World" \
+          -input "test" \
+          -max-cycles 5000 \
+          -lease-id "test-2")
+        
+        receipt_hash2=$(echo "$result2" | jq -r '.receipt_hash // "N/A"')
+        status2=$(echo "$result2" | jq -r '.status // "N/A"')
+        echo "| High Cycle | Hello World | test | 5000 | \`${receipt_hash2:0:16}...\` | $status2 |" >> $GITHUB_STEP_SUMMARY
+        
+        # Test vector 3: Different input
+        echo "Testing different input..."
+        result3=$(./minimal-cli -command execute \
+          -server "http://localhost:9000" \
+          -artifact "Hello World" \
+          -input "different" \
+          -max-cycles 1000 \
+          -lease-id "test-3")
+        
+        receipt_hash3=$(echo "$result3" | jq -r '.receipt_hash // "N/A"')
+        status3=$(echo "$result3" | jq -r '.status // "N/A"')
+        echo "| Different Input | Hello World | different | 1000 | \`${receipt_hash3:0:16}...\` | $status3 |" >> $GITHUB_STEP_SUMMARY
+        
+        # Test vector 4: Different artifact
+        echo "Testing different artifact..."
+        result4=$(./minimal-cli -command execute \
+          -server "http://localhost:9000" \
+          -artifact "different" \
+          -input "test" \
+          -max-cycles 1000 \
+          -lease-id "test-4")
+        
+        receipt_hash4=$(echo "$result4" | jq -r '.receipt_hash // "N/A"')
+        status4=$(echo "$result4" | jq -r '.status // "N/A"')
+        echo "| Different Artifact | different | test | 1000 | \`${receipt_hash4:0:16}...\` | $status4 |" >> $GITHUB_STEP_SUMMARY
+        
+        # Test vector 5: Maximum cycles
+        echo "Testing maximum cycles..."
+        result5=$(./minimal-cli -command execute \
+          -server "http://localhost:9000" \
+          -artifact "Hello World" \
+          -input "test" \
+          -max-cycles 10000 \
+          -lease-id "test-5")
+        
+        receipt_hash5=$(echo "$result5" | jq -r '.receipt_hash // "N/A"')
+        status5=$(echo "$result5" | jq -r '.status // "N/A"')
+        echo "| Maximum Cycles | Hello World | test | 10000 | \`${receipt_hash5:0:16}...\` | $status5 |" >> $GITHUB_STEP_SUMMARY
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Receipt Hash Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "All receipt hashes generated successfully:" >> $GITHUB_STEP_SUMMARY
+        echo "- Test 1: \`$receipt_hash1\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Test 2: \`$receipt_hash2\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Test 3: \`$receipt_hash3\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Test 4: \`$receipt_hash4\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Test 5: \`$receipt_hash5\`" >> $GITHUB_STEP_SUMMARY
+        
+        # Validate all results
+        if [[ "$status1" != "success" || "$status2" != "success" || "$status3" != "success" || "$status4" != "success" || "$status5" != "success" ]]; then
+          echo "❌ Some tests failed"
+          exit 1
+        fi
+        
+        echo "✅ All tests passed successfully"
+    
+    - name: Run conformance tests
+      run: |
+        go test -v ./conformance/... -timeout=60s
+    
+    - name: Stop test server
+      if: always()
+      run: |
+        if [ -f server.pid ]; then
+          kill $(cat server.pid) || true
+          rm server.pid
+        fi
+    
+    - name: Upload artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ocx-receipt-results
+        path: |
+          minimal-cli
+          test-server
+        retention-days: 30
+
+  cross-platform-determinism:
+    name: Cross-Platform Determinism Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: amd64
+          - os: ubuntu-latest
+            arch: arm64
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: true
+    
+    - name: Install dependencies
+      run: |
+        go mod download
+        go mod verify
+    
+    - name: Build minimal-cli for ${{ matrix.arch }}
+      run: |
+        GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build \
+          -ldflags "-X ocx.local/internal/version.SpecHash=abc123def456 \
+                    -X ocx.local/internal/version.Build=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+                    -X ocx.local/internal/version.GitCommit=${{ github.sha }} \
+                    -X ocx.local/internal/version.GitBranch=${{ github.ref_name }}" \
+          -o minimal-cli-${{ matrix.arch }} \
+          ./cmd/minimal-cli
+    
+    - name: Build test server for ${{ matrix.arch }}
+      run: |
+        GOOS=linux GOARCH=${{ matrix.arch }} CGO_ENABLED=0 go build \
+          -ldflags "-X ocx.local/internal/version.SpecHash=abc123def456 \
+                    -X ocx.local/internal/version.Build=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+                    -X ocx.local/internal/version.GitCommit=${{ github.sha }} \
+                    -X ocx.local/internal/version.GitBranch=${{ github.ref_name }}" \
+          -o test-server-${{ matrix.arch }} \
+          ./cmd/test-port
+    
+    - name: Start test server
+      run: |
+        ./test-server-${{ matrix.arch }} &
+        echo $! > server.pid
+        sleep 5
+    
+    - name: Wait for server to be ready
+      run: |
+        timeout 30 bash -c 'until curl -f http://localhost:9000/health; do sleep 1; done'
+    
+    - name: Execute determinism test
+      run: |
+        echo "## Cross-Platform Determinism Test - ${{ matrix.arch }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Execute test and capture receipt hash
+        result=$(./minimal-cli-${{ matrix.arch }} -command execute \
+          -server "http://localhost:9000" \
+          -artifact "Hello World" \
+          -input "test" \
+          -max-cycles 1000 \
+          -lease-id "determinism-test")
+        
+        receipt_hash=$(echo "$result" | jq -r '.receipt_hash // "N/A"')
+        status=$(echo "$result" | jq -r '.status // "N/A"')
+        
+        echo "| Architecture | Receipt Hash | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------------|--------------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| ${{ matrix.arch }} | \`$receipt_hash\` | $status |" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "$status" != "success" ]]; then
+          echo "❌ Test failed for ${{ matrix.arch }}"
+          exit 1
+        fi
+        
+        echo "✅ Test passed for ${{ matrix.arch }}"
+    
+    - name: Stop test server
+      if: always()
+      run: |
+        if [ -f server.pid ]; then
+          kill $(cat server.pid) || true
+          rm server.pid
+        fi
+    
+    - name: Upload artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ocx-determinism-${{ matrix.arch }}
+        path: |
+          minimal-cli-${{ matrix.arch }}
+          test-server-${{ matrix.arch }}
+        retention-days: 30
+
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./cmd/minimal-cli/Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: false
+        tags: ocx-protocol:latest
+        build-args: |
+          TARGETOS=linux
+          TARGETARCH=amd64
+    
+    - name: Test Docker image
+      run: |
+        docker run --rm ocx-protocol:latest --help

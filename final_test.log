@@ -1,0 +1,6 @@
+[OCX-CORE] 2025/09/18 22:46:48 main.go:70: 🚀 OCX Core Server starting on port 8088
+[OCX-CORE] 2025/09/18 22:46:48 main.go:71: 📖 API Documentation: http://localhost:8088/api
+[OCX-CORE] 2025/09/18 22:46:48 main.go:72: 💓 Health Check: http://localhost:8088/health
+[OCX-CORE] 2025/09/18 22:46:48 main.go:73: 🖥️  GPU Testing: ./scripts/test_rtx5060.sh quick
+[OCX-CORE] 2025/09/18 22:47:05 main.go:84: 🛑 Shutting down server...
+[OCX-CORE] 2025/09/18 22:47:05 main.go:94: ✅ Server stopped

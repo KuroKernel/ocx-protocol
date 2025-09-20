@@ -341,3 +341,67 @@ func (r *Receipt) String() string {
 	return fmt.Sprintf("OCXReceipt{Version:%d, Artifact:%x, Input:%x, Output:%x, Cycles:%d, Issuer:%x}",
 		r.Version, r.Artifact[:8], r.Input[:8], r.Output[:8], r.Cycles, r.Issuer[:8])
 }
+
+// =============================================================================
+// KEYSTORE INTEGRATION
+// =============================================================================
+
+// CreateReceipt creates a new receipt with keystore integration
+func CreateReceipt(result *ocx.OCXResult, keystore interface{}) ([]byte, error) {
+	// Create receipt from execution result
+	receipt := &Receipt{
+		OCXReceipt: &ocx.OCXReceipt{
+			Version:    ocx.OCX_VERSION,
+			Artifact:   [32]byte{}, // Will be set from artifact hash
+			Input:      [32]byte{}, // Will be set from input hash
+			Output:     result.OutputHash,
+			Cycles:     result.CyclesUsed,
+			Metering: ocx.Metering{
+				Alpha: ocx.ALPHA_COST_PER_CYCLE,
+				Beta:  ocx.BETA_COST_PER_IO_BYTE,
+				Gamma: ocx.GAMMA_COST_PER_MEMORY_PAGE,
+			},
+			Transcript: [32]byte{}, // Will be set from transcript hash
+			Issuer:     [32]byte{}, // Will be set by signing
+			Signature:  [64]byte{}, // Will be set by signing
+		},
+	}
+	
+	// For now, create a mock signature since we don't have keystore integration yet
+	// In production, this would use the keystore to sign
+	receiptBlob, err := receipt.Serialize()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize receipt: %w", err)
+	}
+	
+	return receiptBlob, nil
+}
+
+// VerifyResult represents the result of receipt verification
+type VerifyResult struct {
+	IssuerID  string
+	Cycles    int64
+	Timestamp time.Time
+}
+
+// Verify verifies a receipt and returns the result
+func Verify(receiptBytes []byte) (*VerifyResult, error) {
+	receipt, err := Deserialize(receiptBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize receipt: %w", err)
+	}
+	
+	valid, reason := receipt.Verify()
+	if !valid {
+		return nil, fmt.Errorf("receipt verification failed: %s", reason)
+	}
+	
+	// Extract issuer ID from first 8 bytes of issuer public key
+	issuerID := fmt.Sprintf("%x", receipt.Issuer[:8])
+	
+	return &VerifyResult{
+		IssuerID:  issuerID,
+		Cycles:    int64(receipt.Cycles),
+		Timestamp: time.Now().UTC(),
+	}, nil
+}

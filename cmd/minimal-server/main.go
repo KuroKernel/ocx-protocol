@@ -5,6 +5,7 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -133,9 +134,21 @@ func (s *MinimalServer) handleVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Decode base64 receipt blob if needed
+	receiptData := []byte(req.ReceiptBlob)
+	
+	// Try to decode as base64 first
+	if decoded, err := base64.StdEncoding.DecodeString(req.ReceiptBlob); err == nil {
+		receiptData = decoded
+		log.Printf("DEBUG: Base64 decoded receipt, length: %d", len(receiptData))
+	} else {
+		log.Printf("DEBUG: Base64 decode failed: %v, using raw data", err)
+	}
+	
 	// Deserialize receipt
-	receipt, err := receipt.Deserialize([]byte(req.ReceiptBlob))
+	receipt, err := receipt.Deserialize(receiptData)
 	if err != nil {
+		log.Printf("DEBUG: Deserialize failed: %v", err)
 		http.Error(w, "Failed to deserialize receipt", http.StatusBadRequest)
 		return
 	}

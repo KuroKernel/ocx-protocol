@@ -1,0 +1,78 @@
+<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Define precise measurements -->
+    <style>
+      .primary-text { font-family: 'Times New Roman', serif; font-weight: 300; }
+      .secondary-text { font-family: 'Helvetica Neue', sans-serif; font-weight: 400; }
+      .tagline-text { font-family: 'Times New Roman', serif; font-weight: 300; font-style: italic; }
+    </style>
+  </defs>
+  
+  <!-- Main Logo Container -->
+  <g id="ocx-logo-primary">
+    
+    <!-- Hexagon Mark -->
+    <g transform="translate(60, 40)">
+      <!-- Outer hexagon (flat-top orientation) -->
+      <polygon points="40,15 50.981,22.5 50.981,37.5 40,45 29.019,37.5 29.019,22.5" 
+               fill="none" 
+               stroke="#000000" 
+               stroke-width="1.83"
+               stroke-linejoin="round"/>
+      
+      <!-- Inner ring -->
+      <polygon points="40,21.38 46.608,25.19 46.608,32.81 40,36.62 33.392,32.81 33.392,25.19" 
+               fill="none" 
+               stroke="#000000" 
+               stroke-width="1.83"
+               stroke-linejoin="round"/>
+      
+      <!-- Core circle -->
+      <circle cx="40" cy="30" r="3.96" 
+              fill="#000000"/>
+      
+      <!-- Crosshair (precision targeting) -->
+      <line x1="36.633" y1="30" x2="43.367" y2="30" 
+            stroke="#FFFFFF" 
+            stroke-width="1.83" 
+            stroke-linecap="square"/>
+      <line x1="40" y1="26.633" x2="40" y2="33.367" 
+            stroke="#FFFFFF" 
+            stroke-width="1.83" 
+            stroke-linecap="square"/>
+    </g>
+    
+    <!-- Wordmark -->
+    <g transform="translate(120, 40)">
+      <!-- OCX Primary -->
+      <text x="0" y="32" 
+            class="primary-text"
+            font-size="36" 
+            letter-spacing="-0.5px"
+            fill="#000000">OCX</text>
+      
+      <!-- PROTOCOL Secondary -->
+      <text x="0" y="55" 
+            class="secondary-text"
+            font-size="10" 
+            letter-spacing="1.8px"
+            fill="#000000"
+            opacity="0.85">PROTOCOL</text>
+      
+      <!-- Tagline -->
+      <text x="0" y="72" 
+            class="tagline-text"
+            font-size="8" 
+            letter-spacing="0.6px"
+            fill="#000000" 
+            opacity="0.65">Mathematical proof for computational integrity</text>
+    </g>
+    
+    <!-- Precision accent elements -->
+    <g transform="translate(420, 45)" opacity="0.3">
+      <line x1="0" y1="0" x2="20" y2="0" stroke="#000000" stroke-width="0.5"/>
+      <line x1="0" y1="8" x2="15" y2="8" stroke="#000000" stroke-width="0.5"/>
+      <line x1="0" y1="16" x2="25" y2="16" stroke="#000000" stroke-width="0.5"/>
+    </g>
+  </g>
+</svg>

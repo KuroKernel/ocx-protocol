@@ -1,6 +1,8 @@
 # OCX Protocol v1.0.0-rc.1
 
-**Production-Ready Deterministic Computation Infrastructure**
+**Mathematical proof for computational integrity**
+
+![OCX Protocol Logo](./public/assets/logos/ocx-logo-primary.svg)
 
 [![OCX Protocol](https://img.shields.io/badge/OCX-Protocol%20v1.0.0--rc.1-blue)](https://github.com/ocx-protocol/ocx)
 [![Specification](https://img.shields.io/badge/Spec-v1--min%20FROZEN-green)](./docs/spec-v1.md)

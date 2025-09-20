@@ -1,20 +1,9 @@
-[
-  {
-    "name": "lightweight_computation",
-    "ops_per_sec": 1209189842.8053205,
-    "ns_per_op": 0.827,
-    "cycles": 25
-  },
-  {
-    "name": "medium_computation",
-    "ops_per_sec": 869565217.3913044,
-    "ns_per_op": 1.15,
-    "cycles": 500
-  },
-  {
-    "name": "heavy_computation",
-    "ops_per_sec": 188679245.2830189,
-    "ns_per_op": 5.3,
-    "cycles": 5000
-  }
-]
+goos: linux
+goarch: amd64
+pkg: ocx.local/benchmarks
+cpu: 13th Gen Intel(R) Core(TM) i5-13400F
+BenchmarkReceiptGeneration-16         	 4039209	       299.1 ns/op	      64 B/op	       1 allocs/op
+BenchmarkReceiptVerification-16       	1000000000	         0.5433 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDeterministicExecution-16    	  568468	      2124 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	ocx.local/benchmarks	3.341s

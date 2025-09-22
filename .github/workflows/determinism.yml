@@ -1,0 +1,240 @@
+name: Determinism Validation
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  dual-image:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        img: ["ubuntu:22.04", "alpine:3.20"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.18'
+
+      - name: Build D-MVM
+        run: |
+          cd ocx-protocol
+          make build-deterministicvm
+
+      - name: Build deterministic shim
+        run: |
+          cd ocx-protocol/pkg/deterministicvm
+          gcc -shared -fPIC -O2 -o libocx_dvm_shim.so ocx_dvm_shim.c
+
+      - name: Create test artifact
+        run: |
+          cd ocx-protocol
+          mkdir -p testdata
+          echo '#!/bin/bash\necho "Hello from $1"\necho "Input: $(cat)"' > testdata/a1.bin
+          chmod +x testdata/a1.bin
+
+      - name: Run artifact in container
+        run: |
+          cd ocx-protocol
+          docker run --rm -v $PWD:/w -w /w ${{ matrix.img }} \
+            ./ocx run --artifact testdata/a1.bin --input "test" --digest-out digest.txt
+          cat digest.txt >> digests.all
+
+      - name: Compare digests
+        run: |
+          cd ocx-protocol
+          if [ -f digests.all ]; then
+            echo "Digests from all runs:"
+            cat digests.all
+            # Check if all digests are identical
+            first_digest=$(head -1 digests.all)
+            all_same=true
+            while read -r digest; do
+              if [ "$digest" != "$first_digest" ]; then
+                echo "❌ Determinism violation: $digest != $first_digest"
+                all_same=false
+              fi
+            done < digests.all
+            
+            if [ "$all_same" = true ]; then
+              echo "✅ All digests are identical - determinism verified"
+            else
+              echo "❌ Determinism test failed"
+              exit 1
+            fi
+          else
+            echo "❌ No digests generated"
+            exit 1
+          fi
+
+  negatives:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.18'
+
+      - name: Build D-MVM
+        run: |
+          cd ocx-protocol
+          make build-deterministicvm
+
+      - name: Build deterministic shim
+        run: |
+          cd ocx-protocol/pkg/deterministicvm
+          gcc -shared -fPIC -O2 -o libocx_dvm_shim.so ocx_dvm_shim.c
+
+      - name: Negative test suite
+        run: |
+          cd ocx-protocol
+          echo "Running negative tests..."
+          
+          # Test network blocking
+          echo "Testing network blocking..."
+          if ./ocx selftest --expect-deny network; then
+            echo "✅ Network blocking test passed"
+          else
+            echo "❌ Network blocking test failed"
+            exit 1
+          fi
+          
+          # Test time blocking
+          echo "Testing time blocking..."
+          if ./ocx selftest --expect-deny time; then
+            echo "✅ Time blocking test passed"
+          else
+            echo "❌ Time blocking test failed"
+            exit 1
+          fi
+          
+          # Test RNG blocking
+          echo "Testing RNG blocking..."
+          if ./ocx selftest --expect-deny rng; then
+            echo "✅ RNG blocking test passed"
+          else
+            echo "❌ RNG blocking test failed"
+            exit 1
+          fi
+
+  performance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.18'
+
+      - name: Build D-MVM
+        run: |
+          cd ocx-protocol
+          make build-deterministicvm
+
+      - name: Performance test
+        run: |
+          cd ocx-protocol
+          echo "Running performance tests..."
+          
+          # Run multiple executions and measure p95 latency
+          for i in {1..100}; do
+            start_time=$(date +%s%N)
+            ./ocx run --artifact testdata/a1.bin --input "perf_test_$i"
+            end_time=$(date +%s%N)
+            duration=$(( (end_time - start_time) / 1000000 )) # Convert to milliseconds
+            echo "$duration" >> latencies.txt
+          done
+          
+          # Calculate p95
+          p95=$(sort -n latencies.txt | tail -n 5 | head -n 1)
+          echo "P95 latency: ${p95}ms"
+          
+          # Check if p95 is within acceptable limits (15ms)
+          if [ "$p95" -le 15 ]; then
+            echo "✅ Performance test passed (p95: ${p95}ms <= 15ms)"
+          else
+            echo "❌ Performance test failed (p95: ${p95}ms > 15ms)"
+            exit 1
+          fi
+
+  evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.18'
+
+      - name: Build D-MVM
+        run: |
+          cd ocx-protocol
+          make build-deterministicvm
+
+      - name: Evidence generation test
+        run: |
+          cd ocx-protocol
+          echo "Testing evidence generation..."
+          
+          # Run execution and capture evidence
+          ./ocx run --artifact testdata/a1.bin --input "evidence_test" 2>&1 | grep "EVIDENCE" > evidence.log
+          
+          if [ -s evidence.log ]; then
+            echo "✅ Evidence generated successfully:"
+            cat evidence.log
+            
+            # Validate evidence structure
+            evidence=$(cat evidence.log | sed 's/.*EVIDENCE //')
+            if echo "$evidence" | jq -e '.schema == "evidence_v1"' > /dev/null; then
+              echo "✅ Evidence schema validation passed"
+            else
+              echo "❌ Evidence schema validation failed"
+              exit 1
+            fi
+            
+            if echo "$evidence" | jq -e '.receipt_hash != null' > /dev/null; then
+              echo "✅ Receipt hash present"
+            else
+              echo "❌ Receipt hash missing"
+              exit 1
+            fi
+            
+            if echo "$evidence" | jq -e '.env_hash != null' > /dev/null; then
+              echo "✅ Environment hash present"
+            else
+              echo "❌ Environment hash missing"
+              exit 1
+            fi
+            
+            if echo "$evidence" | jq -e '.seed != null' > /dev/null; then
+              echo "✅ Seed present"
+            else
+              echo "❌ Seed missing"
+              exit 1
+            fi
+            
+            if echo "$evidence" | jq -e '.rusage != null' > /dev/null; then
+              echo "✅ Resource usage present"
+            else
+              echo "❌ Resource usage missing"
+              exit 1
+            fi
+          else
+            echo "❌ No evidence generated"
+            exit 1
+          fi

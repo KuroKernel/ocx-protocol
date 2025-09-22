@@ -223,30 +223,41 @@ func (s *Server) handleExecute(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	// 3. GENERATE RECEIPT: Build the execution receipt from the result
-	receipt := &OCXReceipt{
+	receipt := &deterministicvm.OCXReceipt{
 		SpecHash:     req.SpecHash,
 		ArtifactHash: req.ArtifactHash,
 		InputHash:    sha256.Sum256(req.Input),
 		OutputHash:   sha256.Sum256(result.Stdout), // Use stdout as the primary output
 		CyclesUsed:   result.CyclesUsed,
-		MemoryUsed:   result.MemoryUsed,
-		StartedAt:    startedAt,
-		FinishedAt:   result.EndTime,
-		ExitCode:     result.ExitCode,
+		StartedAt:    uint64(startedAt.Unix()),
+		FinishedAt:   uint64(result.EndTime.Unix()),
+		IssuerID:     "ocx-server-v1",
 	}
 	
-	// 4. SIGN RECEIPT (placeholder - implement your signing logic)
-	if err := s.signReceipt(receipt); err != nil {
-		s.sendError(w, "Failed to sign receipt", http.StatusInternalServerError)
+	// 4. CANONICALIZE AND SIGN RECEIPT
+	canonicalBytes, err := deterministicvm.CanonicalizeReceipt(receipt)
+	if err != nil {
+		s.sendError(w, "Failed to canonicalize receipt", http.StatusInternalServerError)
 		return
 	}
 	
-	// 5. RESPOND: Send the receipt back to the client
-	w.Header().Set("Content-Type", "application/json")
+	// Sign the canonical bytes (placeholder - implement your signing logic)
+	signature := s.signCanonicalReceipt(canonicalBytes)
+	receipt.Signature = signature
+	
+	// Re-canonicalize with signature
+	canonicalBytes, err = deterministicvm.CanonicalizeReceipt(receipt)
+	if err != nil {
+		s.sendError(w, "Failed to canonicalize signed receipt", http.StatusInternalServerError)
+		return
+	}
+	
+	// 5. RESPOND: Send the canonical CBOR receipt back to the client
+	w.Header().Set("Content-Type", "application/cbor")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(receipt); err != nil {
+	if _, err := w.Write(canonicalBytes); err != nil {
 		// Log the error but can't change response at this point
-		fmt.Printf("Failed to encode response: %v\n", err)
+		fmt.Printf("Failed to write response: %v\n", err)
 	}
 }
 
@@ -331,6 +342,23 @@ func (s *Server) signReceipt(receipt *OCXReceipt) error {
 	// 4. Add the signature to the receipt
 	
 	return nil
+}
+
+// signCanonicalReceipt signs the canonical CBOR bytes
+func (s *Server) signCanonicalReceipt(canonicalBytes []byte) []byte {
+	// TODO: Implement your cryptographic signing logic here
+	// This would typically:
+	// 1. Create the signing message with domain separator
+	// 2. Sign with Ed25519 private key
+	// 3. Return the 64-byte signature
+	
+	// For now, return a placeholder signature
+	// In production, this should be a real Ed25519 signature
+	placeholder := make([]byte, 64)
+	for i := range placeholder {
+		placeholder[i] = byte(i % 256)
+	}
+	return placeholder
 }
 
 // parseHashFromHex converts a hex string to a 32-byte hash

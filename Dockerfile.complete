@@ -23,10 +23,16 @@ COPY . .
 COPY --from=rust-builder /app/libocx-verify/target/release/libocx_verify.a ./libocx-verify/target/release/
 COPY --from=rust-builder /app/libocx-verify/target/release/libocx_verify.so ./libocx-verify/target/release/
 
-# Build Go components
+# Copy D-MVM source
+COPY pkg/deterministicvm/ ./pkg/deterministicvm/
+
+# Build Go components with D-MVM
 RUN go build -tags rust_verifier -ldflags="-w -s" -o bin/ocx-server ./cmd/server
 RUN go build -o bin/ad2-webhook ./cmd/ocx-webhook
 RUN go build -o bin/ocx-verifier ./cmd/ocx-verifier
+
+# Test D-MVM integration
+RUN go test ./pkg/deterministicvm/ -v
 
 # Stage 3: C++ Builder (Envoy Filter)
 FROM gcc:11 AS cpp-builder
@@ -103,9 +109,13 @@ COPY --from=terraform-builder /app/adapters/ad5-terraform/bin/terraform-provider
 # Update library path
 RUN ldconfig
 
+# Create artifact cache directory for D-MVM
+RUN mkdir -p /var/cache/ocx/artifacts && chmod 755 /var/cache/ocx/artifacts
+
 # Create non-root user
 RUN useradd -r -s /bin/false ocx
 RUN chown -R ocx:ocx /app
+RUN chown -R ocx:ocx /var/cache/ocx
 USER ocx
 
 # Health check

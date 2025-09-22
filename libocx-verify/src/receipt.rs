@@ -4,9 +4,10 @@ use crate::canonical_cbor::{CanonicalValue, CborParser};
 use crate::VerificationError;
 use std::collections::BTreeMap;
 use std::time::{SystemTime, UNIX_EPOCH};
+use serde_cbor;
 
 /// A verified OCX Receipt containing all cryptographically protected fields.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OcxReceipt {
     /// Hash of the execution artifact (32 bytes).
     pub artifact_hash: [u8; 32],
@@ -29,6 +30,21 @@ pub struct OcxReceipt {
     /// Optional: Hash of the original request for binding (v1.1 feature).
     pub request_digest: Option<[u8; 32]>,
     /// Optional: Additional witness signatures for multi-party verification.
+    pub witness_signatures: Vec<Vec<u8>>,
+}
+
+/// Helper struct for unsigned receipt serialization
+#[derive(Debug, Clone)]
+pub struct UnsignedReceipt {
+    pub artifact_hash: [u8; 32],
+    pub input_hash: [u8; 32],
+    pub output_hash: [u8; 32],
+    pub cycles_used: u64,
+    pub started_at: u64,
+    pub finished_at: u64,
+    pub issuer_key_id: String,
+    pub prev_receipt_hash: Option<[u8; 32]>,
+    pub request_digest: Option<[u8; 32]>,
     pub witness_signatures: Vec<Vec<u8>>,
 }
 
@@ -95,6 +111,7 @@ impl OcxReceipt {
     /// This reconstructs the canonical CBOR map containing all fields except
     /// the signature itself. The output must be byte-for-byte identical to
     /// what was originally signed.
+    /// Generate the signed data for this receipt (canonical CBOR without signature)
     pub fn signed_data(&self) -> Result<Vec<u8>, VerificationError> {
         let mut map = BTreeMap::new();
 
@@ -154,7 +171,15 @@ impl OcxReceipt {
         }
 
         // Serialize to canonical CBOR
-        Self::serialize_canonical_map(&map)
+        let cbor_data = Self::serialize_canonical_map(&map)?;
+        
+        // Create the complete signing message with domain separator
+        let domain_separator = b"OCXv1|receipt|";
+        let mut message = Vec::new();
+        message.extend_from_slice(domain_separator);
+        message.extend_from_slice(&cbor_data);
+        
+        Ok(message)
     }
 
     /// Extract a required 32-byte hash from the map.
@@ -165,7 +190,7 @@ impl OcxReceipt {
     ) -> Result<[u8; 32], VerificationError> {
         let bytes = Self::extract_bytes(map, key, field_name)?;
         if bytes.len() != 32 {
-            return Err(VerificationError::InvalidFieldValue("field"));
+            return Err(VerificationError::InvalidFieldValue(field_name));
         }
         let mut hash = [0u8; 32];
         hash.copy_from_slice(&bytes);
@@ -199,8 +224,8 @@ impl OcxReceipt {
     ) -> Result<Vec<u8>, VerificationError> {
         match map.get(&CanonicalValue::Integer(key)) {
             Some(CanonicalValue::Bytes(bytes)) => Ok(bytes.clone()),
-            None => Err(VerificationError::MissingField("field")),
-            _ => Err(VerificationError::InvalidFieldValue("field")),
+            None => Err(VerificationError::MissingField(field_name)),
+            _ => Err(VerificationError::InvalidFieldValue(field_name)),
         }
     }
 
@@ -212,8 +237,8 @@ impl OcxReceipt {
     ) -> Result<u64, VerificationError> {
         match map.get(&CanonicalValue::Integer(key)) {
             Some(CanonicalValue::Integer(value)) => Ok(*value),
-            None => Err(VerificationError::MissingField("field")),
-            _ => Err(VerificationError::InvalidFieldValue("field")),
+            None => Err(VerificationError::MissingField(field_name)),
+            _ => Err(VerificationError::InvalidFieldValue(field_name)),
         }
     }
 
@@ -225,8 +250,8 @@ impl OcxReceipt {
     ) -> Result<String, VerificationError> {
         match map.get(&CanonicalValue::Integer(key)) {
             Some(CanonicalValue::Text(text)) => Ok(text.clone()),
-            None => Err(VerificationError::MissingField("field")),
-            _ => Err(VerificationError::InvalidFieldValue("field")),
+            None => Err(VerificationError::MissingField(field_name)),
+            _ => Err(VerificationError::InvalidFieldValue(field_name)),
         }
     }
 
@@ -587,5 +612,87 @@ impl OcxReceipt {
             None => Ok(Vec::new()),
             _ => Err(VerificationError::InvalidFieldValue("field")),
         }
+    }
+
+    /// Convert to canonical CBOR format (unsigned version for signing)
+    fn to_canonical_cbor_unsigned(&self, unsigned: &UnsignedReceipt) -> Result<Vec<u8>, VerificationError> {
+        // Use the same CBOR encoding as the Go side with integer keys
+        let mut cbor_map = std::collections::BTreeMap::new();
+        
+        // Map fields to integer keys (matching OCX-CBOR v1.1 spec)
+        cbor_map.insert(serde_cbor::Value::Integer(1), serde_cbor::Value::Bytes(unsigned.artifact_hash.to_vec()));
+        cbor_map.insert(serde_cbor::Value::Integer(2), serde_cbor::Value::Bytes(unsigned.input_hash.to_vec()));
+        cbor_map.insert(serde_cbor::Value::Integer(3), serde_cbor::Value::Bytes(unsigned.output_hash.to_vec()));
+        cbor_map.insert(serde_cbor::Value::Integer(4), serde_cbor::Value::Integer(unsigned.cycles_used as i128));
+        cbor_map.insert(serde_cbor::Value::Integer(5), serde_cbor::Value::Integer(unsigned.started_at as i128));
+        cbor_map.insert(serde_cbor::Value::Integer(6), serde_cbor::Value::Integer(unsigned.finished_at as i128));
+        cbor_map.insert(serde_cbor::Value::Integer(7), serde_cbor::Value::Text(unsigned.issuer_key_id.clone()));
+        
+        // Optional fields (only include if present)
+        if let Some(prev_hash) = unsigned.prev_receipt_hash {
+            cbor_map.insert(serde_cbor::Value::Integer(9), serde_cbor::Value::Bytes(prev_hash.to_vec()));
+        }
+        
+        if let Some(request_digest) = unsigned.request_digest {
+            cbor_map.insert(serde_cbor::Value::Integer(10), serde_cbor::Value::Bytes(request_digest.to_vec()));
+        }
+        
+        if !unsigned.witness_signatures.is_empty() {
+            let witness_array: Vec<serde_cbor::Value> = unsigned.witness_signatures
+                .iter()
+                .map(|sig| serde_cbor::Value::Bytes(sig.to_vec()))
+                .collect();
+            cbor_map.insert(serde_cbor::Value::Integer(11), serde_cbor::Value::Array(witness_array));
+        }
+        
+        // Note: Signature field (key 8) is intentionally omitted for signing
+        
+        let cbor_value = serde_cbor::Value::Map(cbor_map);
+        
+        // Serialize with deterministic encoding
+        let mut buffer = Vec::new();
+        serde_cbor::to_writer(&mut buffer, &cbor_value)
+            .map_err(|_| VerificationError::InvalidCbor)?;
+            
+        Ok(buffer)
+    }
+
+    /// Convert complete receipt to canonical CBOR (including signature) - serde_cbor version
+    pub fn to_canonical_cbor_serde(&self) -> Result<Vec<u8>, VerificationError> {
+        let mut cbor_map = std::collections::BTreeMap::new();
+        
+        // All fields including signature
+        cbor_map.insert(serde_cbor::Value::Integer(1), serde_cbor::Value::Bytes(self.artifact_hash.to_vec()));
+        cbor_map.insert(serde_cbor::Value::Integer(2), serde_cbor::Value::Bytes(self.input_hash.to_vec()));
+        cbor_map.insert(serde_cbor::Value::Integer(3), serde_cbor::Value::Bytes(self.output_hash.to_vec()));
+        cbor_map.insert(serde_cbor::Value::Integer(4), serde_cbor::Value::Integer(self.cycles_used as i128));
+        cbor_map.insert(serde_cbor::Value::Integer(5), serde_cbor::Value::Integer(self.started_at as i128));
+        cbor_map.insert(serde_cbor::Value::Integer(6), serde_cbor::Value::Integer(self.finished_at as i128));
+        cbor_map.insert(serde_cbor::Value::Integer(7), serde_cbor::Value::Text(self.issuer_key_id.clone()));
+        cbor_map.insert(serde_cbor::Value::Integer(8), serde_cbor::Value::Bytes(self.signature.to_vec()));
+        
+        // Optional fields
+        if let Some(prev_hash) = self.prev_receipt_hash {
+            cbor_map.insert(serde_cbor::Value::Integer(9), serde_cbor::Value::Bytes(prev_hash.to_vec()));
+        }
+        
+        if let Some(request_digest) = self.request_digest {
+            cbor_map.insert(serde_cbor::Value::Integer(10), serde_cbor::Value::Bytes(request_digest.to_vec()));
+        }
+        
+        if !self.witness_signatures.is_empty() {
+            let witness_array: Vec<serde_cbor::Value> = self.witness_signatures
+                .iter()
+                .map(|sig| serde_cbor::Value::Bytes(sig.to_vec()))
+                .collect();
+            cbor_map.insert(serde_cbor::Value::Integer(11), serde_cbor::Value::Array(witness_array));
+        }
+        
+        let cbor_value = serde_cbor::Value::Map(cbor_map);
+        let mut buffer = Vec::new();
+        serde_cbor::to_writer(&mut buffer, &cbor_value)
+            .map_err(|_| VerificationError::InvalidCbor)?;
+            
+        Ok(buffer)
     }
 }

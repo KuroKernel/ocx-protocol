@@ -4,8 +4,18 @@
 package deterministicvm
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
+	"fmt"
+	"math/rand"
+	"os"
+	"runtime"
 	"time"
+
+	"github.com/fxamacker/cbor/v2"
 )
 
 // VM defines the interface for different virtual machine backends.
@@ -41,6 +51,9 @@ type VMConfig struct {
 	
 	// MemoryLimit specifies the maximum memory usage in bytes
 	MemoryLimit uint64
+	
+	// Seed for deterministic random number generation
+	Seed uint32
 }
 
 // ExecutionResult contains all outputs and metadata from artifact execution.
@@ -143,3 +156,124 @@ func DefaultVMConfig() VMConfig {
 		},
 	}
 }
+
+// =============================================================================
+// CANONICAL CBOR UTILITIES
+// =============================================================================
+
+// CanonicalCBORMode creates deterministic CBOR encoding
+var CanonicalCBORMode, _ = cbor.EncOptions{
+	Sort:          cbor.SortCanonical,     // Sort map keys canonically
+	ShortestFloat: cbor.ShortestFloat16,   // Use shortest float encoding
+	NaNConvert:    cbor.NaNConvert7e00,    // Convert NaN consistently
+	InfConvert:    cbor.InfConvertFloat16, // Convert Inf consistently
+	IndefLength:   cbor.IndefLengthForbidden, // No indefinite lengths
+}.EncMode()
+
+// OCXReceipt represents the receipt structure for canonical CBOR encoding
+type OCXReceipt struct {
+	SpecHash      [32]byte `cbor:"1,keyasint"`
+	ArtifactHash  [32]byte `cbor:"2,keyasint"`
+	InputHash     [32]byte `cbor:"3,keyasint"`
+	OutputHash    [32]byte `cbor:"4,keyasint"`
+	CyclesUsed    uint64   `cbor:"5,keyasint"`
+	StartedAt     uint64   `cbor:"6,keyasint"`
+	FinishedAt    uint64   `cbor:"7,keyasint"`
+	IssuerID      string   `cbor:"8,keyasint"`
+	Signature     []byte   `cbor:"9,keyasint"`
+}
+
+// CanonicalizeReceipt ensures receipt is in canonical CBOR form
+func CanonicalizeReceipt(receipt *OCXReceipt) ([]byte, error) {
+	// Encode to canonical CBOR
+	canonical, err := CanonicalCBORMode.Marshal(receipt)
+	if err != nil {
+		return nil, fmt.Errorf("canonical encoding failed: %w", err)
+	}
+	
+	// Verify idempotence: decode and re-encode should be identical
+	var decoded OCXReceipt
+	if err := cbor.Unmarshal(canonical, &decoded); err != nil {
+		return nil, fmt.Errorf("canonical verification failed: %w", err)
+	}
+	
+	reencoded, err := CanonicalCBORMode.Marshal(&decoded)
+	if err != nil {
+		return nil, fmt.Errorf("re-encoding failed: %w", err)
+	}
+	
+	if !bytes.Equal(canonical, reencoded) {
+		return nil, fmt.Errorf("CBOR encoding is not idempotent")
+	}
+	
+	return canonical, nil
+}
+
+// toCanonicalCBOR returns the canonical CBOR representation of the receipt
+func (r *OCXReceipt) toCanonicalCBOR() []byte {
+	canonical, err := CanonicalizeReceipt(r)
+	if err != nil {
+		// Return empty bytes if canonicalization fails
+		return []byte{}
+	}
+	return canonical
+}
+
+// =============================================================================
+// DETERMINISTIC RNG UTILITIES
+// =============================================================================
+
+// DeterministicRNG provides seeded random number generation
+type DeterministicRNG struct {
+	seed uint64
+	rand *rand.Rand
+}
+
+// NewDeterministicRNG creates a new seeded RNG
+func NewDeterministicRNG(seed uint64) *DeterministicRNG {
+	source := rand.NewSource(int64(seed))
+	return &DeterministicRNG{
+		seed: seed,
+		rand: rand.New(source),
+	}
+}
+
+// Seed returns the current seed
+func (r *DeterministicRNG) Seed() uint64 {
+	return r.seed
+}
+
+// calculateSeed creates a deterministic seed from artifact and input
+func calculateSeed(artifactPath string, input []byte) uint64 {
+	h := sha256.New()
+	h.Write([]byte(artifactPath))
+	h.Write(input)
+	h.Write([]byte("OCX-DETERMINISTIC-SEED-V1"))
+	
+	sum := h.Sum(nil)
+	return binary.BigEndian.Uint64(sum[:8])
+}
+
+// =============================================================================
+// ENVIRONMENT HASH UTILITIES
+// =============================================================================
+
+// calculateEnvironmentHash creates a hash of environment factors that affect determinism
+func calculateEnvironmentHash() string {
+	h := sha256.New()
+	
+	// Hash platform information
+	h.Write([]byte(runtime.GOOS))
+	h.Write([]byte(runtime.GOARCH))
+	h.Write([]byte(runtime.Version()))
+	h.Write([]byte(getKernelVersionSafe()))
+	
+	// Hash environment variables that affect execution
+	envVars := []string{"PATH", "LC_ALL", "TZ", "HOME", "USER"}
+	for _, envVar := range envVars {
+		h.Write([]byte(envVar + "=" + os.Getenv(envVar)))
+	}
+	
+	return hex.EncodeToString(h.Sum(nil))
+}
+

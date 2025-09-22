@@ -35,7 +35,7 @@ fn demo_receipt_creation_and_verification() {
 
 #[test]
 fn demo_golden_vectors_verification() {
-    let vectors_dir = PathBuf::from("../conformance/receipts/v1");
+    let vectors_dir = PathBuf::from("../conformance/conformance/receipts/v1");
     
     if !vectors_dir.exists() {
         println!("⚠️  Golden vectors not found. Run: make generate-vectors");

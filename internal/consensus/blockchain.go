@@ -7,27 +7,18 @@ import (
 	"fmt"
 	"math/big"
 	"time"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 // BlockchainClient handles blockchain interactions
 type BlockchainClient struct {
-	client     *ethclient.Client
 	chainID    *big.Int
-	ocxAddress common.Address
+	ocxAddress string // Simplified address representation
 }
 
 // NewBlockchainClient creates a new blockchain client
-func NewBlockchainClient(rpcURL string, chainID *big.Int, ocxAddress common.Address) (*BlockchainClient, error) {
-	client, err := ethclient.Dial(rpcURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to blockchain: %w", err)
-	}
-
+func NewBlockchainClient(rpcURL string, chainID *big.Int, ocxAddress string) (*BlockchainClient, error) {
+	// Simplified implementation without ethereum client
 	return &BlockchainClient{
-		client:     client,
 		chainID:    chainID,
 		ocxAddress: ocxAddress,
 	}, nil

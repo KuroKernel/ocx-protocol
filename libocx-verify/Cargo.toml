@@ -12,10 +12,16 @@ crate-type = ["cdylib", "staticlib", "rlib"] # For FFI, static linking, and Rust
 [features]
 default = ["ffi"]
 ffi = []
+trace = []
 
 [dependencies]
 ring = { version = "0.17", default-features = false, features = ["std", "alloc"] } # Crypto primitives.
 hex = "0.4" # Hex encoding for debug output.
+base64 = "0.21" # Base64 encoding/decoding for key management.
+serde = { version = "1.0", features = ["derive"] } # Serialization framework.
+serde_json = "1.0" # JSON parsing for configuration files.
+serde_cbor = "0.11" # CBOR serialization/deserialization.
+ciborium = "0.2" # CBOR serialization/deserialization.
 
 [dev-dependencies]
 tempfile = "3.0" # Temporary files for tests.

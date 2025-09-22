@@ -1,2 +1,0 @@
-query_benchmarks.go:11:2: missing go.sum entry for module providing package github.com/lib/pq (imported by github.com/ocx-protocol/whitepaper-validation/performance); to add:
-	go get github.com/ocx-protocol/whitepaper-validation/performance

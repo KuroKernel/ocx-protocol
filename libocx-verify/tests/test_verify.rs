@@ -68,7 +68,7 @@ fn test_verify_receipt_success() {
     let (receipt, public_key) = create_test_receipt_with_valid_signature();
     
     // Generate CBOR data for the receipt
-    let cbor_data = receipt.signed_data().unwrap();
+    let cbor_data = receipt.to_canonical_cbor().unwrap();
     
     // This test will fail because we can't easily create valid CBOR with signature
     // But we can test the structure and basic validation
@@ -89,7 +89,7 @@ fn test_verify_receipt_invalid_signature() {
                          0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a];
     
     // Generate CBOR data for the receipt
-    let cbor_data = receipt.signed_data().unwrap();
+    let cbor_data = receipt.to_canonical_cbor().unwrap();
     
     // This should fail because the signature is invalid
     let result = verify_receipt(&cbor_data, &public_key, false);
@@ -101,7 +101,7 @@ fn test_verify_receipt_invalid_public_key_length() {
     let receipt = create_test_receipt();
     let invalid_public_key = vec![0x01, 0x02, 0x03]; // Too short
     
-    let cbor_data = receipt.signed_data().unwrap();
+    let cbor_data = receipt.to_canonical_cbor().unwrap();
     
     let result = verify_receipt(&cbor_data, &invalid_public_key, false);
     assert!(matches!(result, Err(VerificationError::InvalidSignature)));
@@ -117,7 +117,7 @@ fn test_verify_receipt_invalid_timestamps() {
                          0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25,
                          0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a];
     
-    let cbor_data = receipt.signed_data().unwrap();
+    let cbor_data = receipt.to_canonical_cbor().unwrap();
     
     let result = verify_receipt(&cbor_data, &public_key, false);
     assert!(matches!(result, Err(VerificationError::InvalidTimestamp)));
@@ -133,7 +133,7 @@ fn test_verify_receipt_zero_cycles() {
                          0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25,
                          0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a];
     
-    let cbor_data = receipt.signed_data().unwrap();
+    let cbor_data = receipt.to_canonical_cbor().unwrap();
     
     let result = verify_receipt(&cbor_data, &public_key, false);
     assert!(matches!(result, Err(VerificationError::InvalidFieldValue("cycles_used"))));
@@ -149,7 +149,7 @@ fn test_verify_receipt_invalid_hash_constraints() {
                          0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25,
                          0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a];
     
-    let cbor_data = receipt.signed_data().unwrap();
+    let cbor_data = receipt.to_canonical_cbor().unwrap();
     
     let result = verify_receipt(&cbor_data, &public_key, false);
     assert!(matches!(result, Err(VerificationError::HashMismatch("artifact_hash"))));
@@ -165,7 +165,7 @@ fn test_verify_receipt_duplicate_hashes() {
                          0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25,
                          0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a];
     
-    let cbor_data = receipt.signed_data().unwrap();
+    let cbor_data = receipt.to_canonical_cbor().unwrap();
     
     let result = verify_receipt(&cbor_data, &public_key, false);
     assert!(matches!(result, Err(VerificationError::HashMismatch("artifact_hash"))));
@@ -181,7 +181,7 @@ fn test_verify_receipt_invalid_signature_length() {
                          0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25,
                          0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a];
     
-    let cbor_data = receipt.signed_data().unwrap();
+    let cbor_data = receipt.to_canonical_cbor().unwrap();
     
     let result = verify_receipt(&cbor_data, &public_key, false);
     assert!(matches!(result, Err(VerificationError::InvalidSignature)));
@@ -197,7 +197,7 @@ fn test_verify_receipt_empty_key_id() {
                          0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25,
                          0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a];
     
-    let cbor_data = receipt.signed_data().unwrap();
+    let cbor_data = receipt.to_canonical_cbor().unwrap();
     
     let result = verify_receipt(&cbor_data, &public_key, false);
     assert!(matches!(result, Err(VerificationError::InvalidFieldValue("issuer_key_id"))));
@@ -206,7 +206,7 @@ fn test_verify_receipt_empty_key_id() {
 #[test]
 fn test_verify_receipt_simple() {
     let receipt = create_test_receipt();
-    let cbor_data = receipt.signed_data().unwrap();
+    let cbor_data = receipt.to_canonical_cbor().unwrap();
     
     // This should work with the test key ID "test"
     let result = verify_receipt_simple(&cbor_data);
@@ -223,7 +223,7 @@ fn test_verify_receipt_with_policy() {
                          0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25,
                          0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a];
     
-    let cbor_data = receipt.signed_data().unwrap();
+    let cbor_data = receipt.to_canonical_cbor().unwrap();
     
     // Test with minimal policy (only signature verification)
     let policy = VerificationPolicy {
@@ -260,7 +260,7 @@ fn test_verify_receipt_witness_signatures() {
                          0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25,
                          0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a];
     
-    let cbor_data = receipt.signed_data().unwrap();
+    let cbor_data = receipt.to_canonical_cbor().unwrap();
     
     // Test with witness verification enabled
     let result = verify_receipt(&cbor_data, &public_key, true);
@@ -277,7 +277,7 @@ fn test_verify_receipt_invalid_witness_signature_length() {
                          0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25,
                          0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a];
     
-    let cbor_data = receipt.signed_data().unwrap();
+    let cbor_data = receipt.to_canonical_cbor().unwrap();
     
     let result = verify_receipt(&cbor_data, &public_key, true);
     assert!(matches!(result, Err(VerificationError::InvalidSignature)));
@@ -293,7 +293,7 @@ fn test_verify_receipt_chain_validation() {
                          0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25,
                          0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a];
     
-    let cbor_data = receipt.signed_data().unwrap();
+    let cbor_data = receipt.to_canonical_cbor().unwrap();
     
     let result = verify_receipt(&cbor_data, &public_key, false);
     assert!(matches!(result, Err(VerificationError::HashMismatch("prev_receipt_hash"))));

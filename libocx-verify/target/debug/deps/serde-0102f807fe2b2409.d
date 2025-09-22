@@ -1,0 +1,14 @@
+/home/kurokernel/Desktop/AXIS/ocx-protocol/libocx-verify/target/debug/deps/serde-0102f807fe2b2409.d: /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/lib.rs /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/integer128.rs /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/private/mod.rs /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/private/de.rs /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/private/ser.rs /home/kurokernel/Desktop/AXIS/ocx-protocol/libocx-verify/target/debug/build/serde-c361e746be1a41a7/out/private.rs
+
+/home/kurokernel/Desktop/AXIS/ocx-protocol/libocx-verify/target/debug/deps/libserde-0102f807fe2b2409.rlib: /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/lib.rs /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/integer128.rs /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/private/mod.rs /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/private/de.rs /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/private/ser.rs /home/kurokernel/Desktop/AXIS/ocx-protocol/libocx-verify/target/debug/build/serde-c361e746be1a41a7/out/private.rs
+
+/home/kurokernel/Desktop/AXIS/ocx-protocol/libocx-verify/target/debug/deps/libserde-0102f807fe2b2409.rmeta: /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/lib.rs /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/integer128.rs /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/private/mod.rs /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/private/de.rs /home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/private/ser.rs /home/kurokernel/Desktop/AXIS/ocx-protocol/libocx-verify/target/debug/build/serde-c361e746be1a41a7/out/private.rs
+
+/home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/lib.rs:
+/home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/integer128.rs:
+/home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/private/mod.rs:
+/home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/private/de.rs:
+/home/kurokernel/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.226/src/private/ser.rs:
+/home/kurokernel/Desktop/AXIS/ocx-protocol/libocx-verify/target/debug/build/serde-c361e746be1a41a7/out/private.rs:
+
+# env-dep:OUT_DIR=/home/kurokernel/Desktop/AXIS/ocx-protocol/libocx-verify/target/debug/build/serde-c361e746be1a41a7/out

@@ -40,9 +40,14 @@ fn test_signed_data_generation() {
     let signed_bytes = signed_data.unwrap();
     assert!(!signed_bytes.is_empty());
     
-    // The signed data should be a valid CBOR map without the signature field
-    // So it should be a map(7) instead of map(8)
-    assert_eq!(signed_bytes[0], 0xa7); // map(7)
+    // The signed data should start with the domain separator "OCXv1|receipt|"
+    // and then contain the CBOR data without the signature field
+    let domain_separator = b"OCXv1|receipt|";
+    assert!(signed_bytes.starts_with(domain_separator));
+    
+    // The CBOR part should be a map(7) without the signature field
+    let cbor_start = domain_separator.len();
+    assert_eq!(signed_bytes[cbor_start], 0xa7); // map(7)
 }
 
 #[test]
@@ -52,16 +57,23 @@ fn test_roundtrip_signed_data() {
     // Generate signed data
     let signed_data = receipt.signed_data().unwrap();
     
-    // Parse the signed data back (it should be valid CBOR)
+    // The signed data should start with the domain separator
+    let domain_separator = b"OCXv1|receipt|";
+    assert!(signed_data.starts_with(domain_separator));
+    
+    // Extract the CBOR part (after the domain separator)
+    let cbor_data = &signed_data[domain_separator.len()..];
+    
+    // Parse the CBOR part back (it should be valid CBOR)
     use libocx_verify::canonical_cbor::CborParser;
-    let parsed = CborParser::new(&signed_data).parse_full();
-    assert!(parsed.is_ok(), "Signed data is not valid canonical CBOR");
+    let parsed = CborParser::new(cbor_data).parse_full();
+    assert!(parsed.is_ok(), "Signed data CBOR part is not valid canonical CBOR");
     
     // The parsed data should be a map with 7 fields (all except signature)
     if let Ok(libocx_verify::canonical_cbor::CanonicalValue::Map(map)) = parsed {
         assert_eq!(map.len(), 7); // All fields except signature
     } else {
-        panic!("Signed data is not a map");
+        panic!("Signed data CBOR part is not a map");
     }
 }
 

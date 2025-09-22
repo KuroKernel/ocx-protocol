@@ -2,6 +2,7 @@ package deterministicvm
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -44,6 +45,9 @@ func ExecuteArtifact(ctx context.Context, artifactHash [32]byte, input []byte) (
 
 	// 7. ENRICH RESULT: Add additional metadata for receipts
 	result = enrichExecutionResult(result, artifactHash, input)
+
+	// 8. GENERATE EVIDENCE: Create audit trail for the execution
+	generateExecutionEvidence(artifactHash, input, result, &config)
 
 	return result, nil
 }
@@ -323,4 +327,34 @@ func isELFBinary(path string) bool {
 	}
 	
 	return magic[0] == 0x7f && magic[1] == 'E' && magic[2] == 'L' && magic[3] == 'F'
+}
+
+// generateExecutionEvidence creates evidence for the execution
+func generateExecutionEvidence(artifactHash [32]byte, input []byte, result *ExecutionResult, config *VMConfig) {
+	// Create a mock receipt for evidence generation
+	receipt := &OCXReceipt{
+		SpecHash:     [32]byte{}, // Would be set by caller
+		ArtifactHash: artifactHash,
+		InputHash:    sha256.Sum256(input),
+		OutputHash:   sha256.Sum256(result.Stdout),
+		CyclesUsed:   result.CyclesUsed,
+		StartedAt:    uint64(result.StartTime.Unix()),
+		FinishedAt:   uint64(result.EndTime.Unix()),
+		IssuerID:     "ocx-dmvm-v1",
+		Signature:    []byte{}, // Would be signed by caller
+	}
+	
+	// Generate receipt hash
+	receiptHash := fmt.Sprintf("sha256:%x", sha256.Sum256(receipt.toCanonicalCBOR()))
+	
+	// Create evidence
+	evidence := CreateEvidence(
+		fmt.Sprintf("artifact_%x", artifactHash),
+		receiptHash,
+		fmt.Sprintf("0x%08x", config.Seed),
+		*config,
+	)
+	
+	// Emit evidence
+	emitEvidence(evidence)
 }

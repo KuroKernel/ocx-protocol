@@ -1,0 +1,3 @@
+cargo:rerun-if-changed=src/ffi.rs
+cargo:rerun-if-changed=ocx_verify.h
+cargo:rerun-if-changed=build.rs

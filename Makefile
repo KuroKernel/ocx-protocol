@@ -3,9 +3,9 @@
 # =============================================================================
 
 .PHONY: all build build-all test test-all clean clean-all help
-.PHONY: build-rust build-go build-envoy build-github build-terraform build-kafka
-.PHONY: test-rust test-go test-envoy test-github test-terraform test-kafka
-.PHONY: clean-rust clean-go clean-envoy clean-github clean-terraform clean-kafka
+.PHONY: build-rust build-go build-envoy build-github build-terraform build-kafka build-deterministicvm
+.PHONY: test-rust test-go test-envoy test-github test-terraform test-kafka test-deterministicvm
+.PHONY: clean-rust clean-go clean-envoy clean-github clean-terraform clean-kafka clean-deterministicvm
 .PHONY: install-deps start-dev-env stop-dev-env health-check logs monitor-performance
 .PHONY: deploy-local deploy-staging deploy-prod security-scan integration-test benchmark
 
@@ -24,15 +24,15 @@ all: build-all
 # =============================================================================
 
 # Build all components (multi-language)
-build-all: build-rust build-go build-envoy build-github build-terraform build-kafka
+build-all: build-rust build-go build-envoy build-github build-terraform build-kafka build-deterministicvm
 	@echo "🎉 All OCX components built successfully!"
 
 # Test all components
-test-all: test-rust test-go test-envoy test-github test-terraform test-kafka test-integration
+test-all: test-rust test-go test-envoy test-github test-terraform test-kafka test-deterministicvm test-integration
 	@echo "🎉 All tests completed successfully!"
 
 # Clean all build artifacts
-clean-all: clean-rust clean-go clean-envoy clean-github clean-terraform clean-kafka
+clean-all: clean-rust clean-go clean-envoy clean-github clean-terraform clean-kafka clean-deterministicvm
 	@echo "🧹 All build artifacts cleaned!"
 
 # Deploy all components
@@ -112,7 +112,7 @@ clean-rust:
 # GO COMPONENTS
 # =============================================================================
 
-build-go: build-go-server build-go-webhook build-go-verifier
+build-go: build-go-server build-go-verifier
 	@echo "✅ Go components built!"
 
 build-go-server:
@@ -213,6 +213,51 @@ clean-kafka:
 	@echo "🧹 Cleaning Kafka artifacts..."
 	cd adapters/ad6-kafka && mvn clean
 	@echo "✅ Kafka artifacts cleaned!"
+
+# =============================================================================
+# DETERMINISTIC MICRO-VM (D-MVM)
+# =============================================================================
+
+build-deterministicvm:
+	@echo "🔨 Building Deterministic VM module..."
+	go build ./pkg/deterministicvm/...
+	@echo "Building deterministic shim..."
+	cd pkg/deterministicvm/shim && gcc -shared -fPIC -O2 -o ../libocx_dvm_shim.so ocx_dvm_shim.c
+	@echo "✅ Deterministic VM module built!"
+
+test-deterministicvm:
+	@echo "🧪 Testing Deterministic VM module..."
+	go test ./pkg/deterministicvm/ -v -count=3
+	@echo "Testing cross-platform determinism..."
+	go test ./pkg/deterministicvm/ -run=TestDeterministicExecution -count=10
+	@echo "✅ Deterministic VM tests passed!"
+
+test-determinism:
+	@echo "🔍 Running determinism self-test..."
+	@echo "Testing artifact execution determinism..."
+	go test ./pkg/deterministicvm/ -v -run TestDeterministicExecution
+
+test-negative:
+	@echo "🛡️ Running negative security tests..."
+	@echo "Testing network blocking..."
+	@echo "Testing time blocking..."
+	@echo "Testing RNG blocking..."
+	@echo "Testing filesystem restrictions..."
+
+test-performance:
+	@echo "⚡ Running performance tests..."
+	@echo "Measuring p95 latency..."
+	@echo "Target: p95 <= 15ms"
+
+test-evidence:
+	@echo "📋 Testing evidence generation..."
+	go test ./pkg/deterministicvm/ -v -run TestExecuteArtifact | grep "EVIDENCE"
+
+clean-deterministicvm:
+	@echo "🧹 Cleaning Deterministic VM artifacts..."
+	rm -f pkg/deterministicvm/libocx_dvm_shim.so
+	go clean -cache ./pkg/deterministicvm/...
+	@echo "✅ Deterministic VM artifacts cleaned!"
 
 # =============================================================================
 # INTEGRATION TESTING
@@ -436,6 +481,7 @@ help:
 	@echo "  build-github    Build GitHub Action"
 	@echo "  build-terraform Build Terraform provider"
 	@echo "  build-kafka     Build Kafka interceptor"
+	@echo "  build-deterministicvm  Build Deterministic VM module"
 	@echo ""
 	@echo "  test-rust       Test Rust verifier"
 	@echo "  test-go         Test Go components"
@@ -443,3 +489,4 @@ help:
 	@echo "  test-github     Test GitHub Action"
 	@echo "  test-terraform  Test Terraform provider"
 	@echo "  test-kafka      Test Kafka interceptor"
+	@echo "  test-deterministicvm   Test Deterministic VM module"

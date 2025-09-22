@@ -1,0 +1,10 @@
+{
+  "program_hash": h'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9',
+  "input_hash": h'c96c6d5be8d08a12e7b5cdc1b207fa6b2430974c86803d8891675e76fd992c20',
+  "output_hash": h'e0ee8bb50685e05fa0f47ed04203ae953fdfd055f5bd2892ea186504254f8c3a',
+  "cycles": 1000,
+  "started_at": 1758564462,
+  "finished_at": 1758564463,
+  "issuer_id": "issuer-0",
+  "signature": h'ac4bd2fd11587f9bb873a7a1480b353975c92b5104c4e68de00d6bc071fcf7dbf45d8c63673b831be72c75576f8162ab5b3bfc6bc2bbc17820a9f6ac60d24007'
+}

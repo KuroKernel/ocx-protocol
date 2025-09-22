@@ -102,6 +102,18 @@ jobs:
         run: |
           go test -v -timeout=30s ./...
           
+      - name: Test D-MVM Integration
+        run: |
+          # Build D-MVM
+          go build ./pkg/deterministicvm/...
+          # Test deterministic execution
+          go test ./pkg/deterministicvm/ -v -count=5
+          # Test OCX integration
+          go test ./cmd/server/ -run=TestExecuteEndpoint -v
+          # Validate real golden vectors
+          go run conformance/generate_real_vectors.go
+          go test ./libocx-verify/tests/ -v
+          
       - name: Run Go benchmarks
         run: |
           go test -bench=. ./pkg/verify/...
@@ -261,12 +273,37 @@ jobs:
           path: adapters/ad6-kafka/target/
 
   # =============================================================================
+  # CROSS-PLATFORM DETERMINISM TEST
+  # =============================================================================
+  determinism:
+    name: Cross-Platform Determinism Test
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    needs: go
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Test cross-platform determinism
+        run: |
+          # Test that same input produces identical output across platforms
+          go test ./pkg/deterministicvm/ -run=TestCrossPlatformDeterminism -v
+          # Test deterministic execution multiple times
+          go test ./pkg/deterministicvm/ -run=TestDeterministicExecution -count=10
+
+  # =============================================================================
   # INTEGRATION TESTS
   # =============================================================================
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
-    needs: [rust, go, envoy, github-action, terraform, kafka]
+    needs: [rust, go, envoy, github-action, terraform, kafka, determinism]
     steps:
       - uses: actions/checkout@v4
       
@@ -324,7 +361,7 @@ jobs:
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
-    needs: [rust, go, envoy, github-action, terraform, kafka]
+    needs: [rust, go, envoy, github-action, terraform, kafka, determinism]
     steps:
       - uses: actions/checkout@v4
       

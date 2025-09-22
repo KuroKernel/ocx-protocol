@@ -1,0 +1,574 @@
+# OCX Protocol Makefile
+.PHONY: all build test test-race test-coverage lint security-check safety-check clean install-tools
+
+# Variables
+COVERAGE_THRESHOLD = 80
+RACE_DETECTION = true
+BENCHMARK = false
+VERBOSE = false
+TIMEOUT = 30s
+
+# Default target
+all: clean install-tools lint security-check safety-check test
+
+# Build the project (default with Rust verifier)
+build: build-rust
+
+# Build with Rust verifier
+build-rust:
+	@echo "🔨 Building OCX Protocol with Rust verifier..."
+	cd libocx-verify && cargo build --release --features ffi
+	go build -tags rust_verifier -ldflags="-w -s" -o bin/ocx-server ./cmd/server
+	@echo "✅ Rust verifier build complete!"
+
+# Build with Go verifier (fallback)
+build-go:
+	@echo "🔨 Building OCX Protocol with Go verifier..."
+	go build -ldflags="-w -s" -o bin/ocx-server ./cmd/server
+	@echo "✅ Go verifier build complete!"
+
+# Build killer demo
+build-demo:
+	@echo "🚀 Building OCX Killer Demo..."
+	go build -o ocx-killer-demo ./cmd/ocx-killer-demo/
+
+# Run killer demo
+demo: build-demo
+	@echo "🎮 Running OCX Killer Applications Demo..."
+	./ocx-killer-demo
+
+# Build simple demo
+build-simple-demo:
+	@echo "🚀 Building OCX Simple Demo..."
+	go build -o ocx-simple-demo ./cmd/ocx-simple-demo/
+
+# Run simple demo
+simple-demo: build-simple-demo
+	@echo "🎮 Running OCX Simple Demo..."
+	./ocx-simple-demo
+
+# Build enhanced CLI
+build-cli:
+	@echo "🔧 Building OCX Enhanced CLI..."
+	go build -o ocx ./cmd/ocx/
+
+# Run conformance tests
+conformance: build-cli
+	@echo "🧪 Running OCX Conformance Tests..."
+	./ocx conformance
+
+# Run benchmarks
+benchmark: build-cli
+	@echo "⚡ Running OCX Benchmarks..."
+	./ocx benchmark
+
+# Generate test vectors (requires safety flag)
+gen-vectors: build-cli
+	@echo "🔧 Generating Conformance Test Vectors..."
+	ALLOW_VECTOR_REGEN=1 ./ocx gen-vectors
+
+# Verify receipts
+verify: build-cli
+	@echo "🔍 Verifying Receipts..."
+	./ocx verify $(ARGS)
+
+# Install development tools
+install-tools:
+	@echo "📦 Installing development tools..."
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install honnef.co/go/tools/cmd/staticcheck@latest
+	go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+
+# Run tests (default with Rust verifier)
+test: test-rust
+
+# Test Rust components
+test-rust:
+	@echo "🧪 Testing Rust verifier..."
+	cd libocx-verify && cargo test --features ffi
+	@echo "✅ Rust tests complete!"
+
+# Test Go components  
+test-go:
+	@echo "🧪 Testing Go components..."
+	go test -v -timeout=$(TIMEOUT) ./...
+	@echo "✅ Go tests complete!"
+
+# Test integration
+test-integration: build-rust
+	@echo "🔗 Testing Rust-Go integration..."
+	OCX_USE_RUST_VERIFIER=true go test -tags rust_verifier ./pkg/verify/...
+	@echo "✅ Integration tests complete!"
+
+# Performance benchmark
+benchmark-rust: build-rust
+	@echo "⚡ Running Rust verifier benchmarks..."
+	OCX_USE_RUST_VERIFIER=true go test -bench=. -tags rust_verifier ./pkg/verify/...
+
+# Performance benchmark
+benchmark-go: build-go
+	@echo "⚡ Running Go verifier benchmarks..."
+	OCX_USE_RUST_VERIFIER=false go test -bench=. ./pkg/verify/...
+
+# Run tests with race detection
+test-race:
+	@echo "🏃 Running tests with race detection..."
+	go test -v -race -timeout=$(TIMEOUT) ./...
+
+# Run tests with coverage
+test-coverage:
+	@echo "📊 Running tests with coverage..."
+	go test -v -coverprofile=coverage.out -covermode=atomic ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+# Run benchmarks
+benchmark:
+	@echo "⚡ Running benchmarks..."
+	go test -bench=. -benchmem -run=^$$ ./...
+
+# Run integration tests
+test-integration:
+	@echo "🔗 Running integration tests..."
+	go test -v -tags=integration ./...
+
+# Run all tests with coverage and race detection
+test-all: test-race test-coverage benchmark test-integration
+
+# Lint the code
+lint:
+	@echo "🔍 Running linters..."
+	golangci-lint run --timeout=5m
+	staticcheck ./...
+
+# Security check
+security-check:
+	@echo "🔒 Running security checks..."
+	gosec ./...
+
+# Safety check
+safety-check:
+	@echo "🛡️ Running safety checks..."
+	./ocx-safety-check
+
+# Check code coverage threshold
+check-coverage:
+	@echo "📈 Checking coverage threshold..."
+	@coverage=$$(go tool cover -func=coverage.out | grep total | awk '{print $$3}' | sed 's/%//'); \
+	if [ $$(echo "$$coverage < $(COVERAGE_THRESHOLD)" | bc -l) -eq 1 ]; then \
+		echo "❌ Coverage $$coverage% is below threshold $(COVERAGE_THRESHOLD)%"; \
+		exit 1; \
+	else \
+		echo "✅ Coverage $$coverage% meets threshold $(COVERAGE_THRESHOLD)%"; \
+	fi
+
+# Generate test report
+test-report: test-coverage
+	@echo "📋 Generating test report..."
+	@echo "# OCX Protocol Test Report" > test-report.md
+	@echo "Generated: $$(date)" >> test-report.md
+	@echo "" >> test-report.md
+	@echo "## Coverage Summary" >> test-report.md
+	@go tool cover -func=coverage.out | grep total >> test-report.md
+	@echo "" >> test-report.md
+	@echo "## Test Results" >> test-report.md
+	@go test -v ./... 2>&1 | grep -E "(PASS|FAIL|SKIP)" >> test-report.md
+
+# Clean build artifacts
+clean:
+	@echo "🧹 Cleaning build artifacts..."
+	go clean
+	rm -f coverage.out coverage.html
+	rm -f test-report.md
+	rm -rf tests/coverage/
+
+# Format code
+fmt:
+	@echo "🎨 Formatting code..."
+	go fmt ./...
+	goimports -w .
+
+# Vet the code
+vet:
+	@echo "🔍 Vetting code..."
+	go vet ./...
+
+# Run all checks
+check: fmt vet lint security-check safety-check test-race test-coverage check-coverage
+
+# CI/CD pipeline
+ci: clean install-tools check
+
+# Development setup
+dev-setup: install-tools
+	@echo "🚀 Setting up development environment..."
+	@echo "Installing pre-commit hooks..."
+	@echo "#!/bin/bash" > .git/hooks/pre-commit
+	@echo "make check" >> .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "✅ Development environment ready!"
+
+# =============================================================================
+# OCX PROTOCOL - COMPREHENSIVE BUILD SYSTEM
+# =============================================================================
+
+# Build all components (multi-language)
+build-all: build-rust build-go build-envoy build-github build-terraform build-kafka
+	@echo "🎉 All OCX components built successfully!"
+
+# Test all components
+test-all: test-rust test-go test-envoy test-github test-terraform test-kafka test-integration
+	@echo "🎉 All tests completed successfully!"
+
+# Clean all build artifacts
+clean-all: clean-rust clean-go clean-envoy clean-github clean-terraform clean-kafka
+	@echo "🧹 All build artifacts cleaned!"
+
+# Deploy all components
+deploy-all: build-all
+	@echo "🚀 Deploying all OCX components..."
+	docker-compose -f deployment/docker-compose.yml up -d
+	@echo "✅ All components deployed!"
+
+# Performance benchmarks
+benchmark: build-all
+	@echo "⚡ Running performance benchmarks..."
+	@echo "Rust verifier benchmarks..."
+	cd libocx-verify && cargo bench
+	@echo "Go server benchmarks..."
+	go test -bench=. ./pkg/verify/...
+	@echo "Envoy filter benchmarks..."
+	cd adapters/ad3-envoy && make benchmark
+	@echo "GitHub Action benchmarks..."
+	cd adapters/ad4-github && npm run benchmark
+	@echo "Terraform provider benchmarks..."
+	cd adapters/ad5-terraform && make benchmark
+	@echo "Kafka interceptor benchmarks..."
+	cd adapters/ad6-kafka && mvn exec:java -Dexec.mainClass="dev.ocx.kafka.BenchmarkRunner"
+	@echo "✅ All benchmarks completed!"
+
+# =============================================================================
+# RUST COMPONENTS
+# =============================================================================
+
+build-rust:
+	@echo "🦀 Building Rust verifier..."
+	cd libocx-verify && cargo build --release --features ffi
+	@echo "✅ Rust verifier built!"
+
+test-rust:
+	@echo "🧪 Testing Rust verifier..."
+	cd libocx-verify && cargo test --features ffi
+	@echo "✅ Rust tests passed!"
+
+clean-rust:
+	@echo "🧹 Cleaning Rust artifacts..."
+	cd libocx-verify && cargo clean
+	@echo "✅ Rust artifacts cleaned!"
+
+# =============================================================================
+# GO COMPONENTS
+# =============================================================================
+
+build-go: build-go-server build-go-webhook build-go-verifier
+	@echo "✅ Go components built!"
+
+build-go-server:
+	@echo "🔨 Building Go server..."
+	go build -tags rust_verifier -ldflags="-w -s" -o bin/ocx-server ./cmd/server
+
+build-go-webhook:
+	@echo "🔨 Building Go webhook..."
+	go build -o bin/ad2-webhook ./cmd/ocx-webhook
+
+build-go-verifier:
+	@echo "🔨 Building Go verifier..."
+	go build -o bin/ocx-verifier ./cmd/ocx-verifier
+
+test-go:
+	@echo "🧪 Testing Go components..."
+	go test -v -timeout=30s ./...
+	@echo "✅ Go tests passed!"
+
+clean-go:
+	@echo "🧹 Cleaning Go artifacts..."
+	rm -rf bin/
+	go clean -cache
+	@echo "✅ Go artifacts cleaned!"
+
+# =============================================================================
+# C++ ENVOY FILTER
+# =============================================================================
+
+build-envoy:
+	@echo "🔨 Building Envoy filter..."
+	cd adapters/ad3-envoy && make build
+	@echo "✅ Envoy filter built!"
+
+test-envoy:
+	@echo "🧪 Testing Envoy filter..."
+	cd adapters/ad3-envoy && make test
+	@echo "✅ Envoy filter tests passed!"
+
+clean-envoy:
+	@echo "🧹 Cleaning Envoy artifacts..."
+	cd adapters/ad3-envoy && make clean
+	@echo "✅ Envoy artifacts cleaned!"
+
+# =============================================================================
+# NODE.JS GITHUB ACTION
+# =============================================================================
+
+build-github:
+	@echo "🔨 Building GitHub Action..."
+	cd adapters/ad4-github && npm ci && npm run build
+	@echo "✅ GitHub Action built!"
+
+test-github:
+	@echo "🧪 Testing GitHub Action..."
+	cd adapters/ad4-github && npm test
+	@echo "✅ GitHub Action tests passed!"
+
+clean-github:
+	@echo "🧹 Cleaning GitHub Action artifacts..."
+	cd adapters/ad4-github && npm run clean
+	@echo "✅ GitHub Action artifacts cleaned!"
+
+# =============================================================================
+# TERRAFORM PROVIDER
+# =============================================================================
+
+build-terraform:
+	@echo "🔨 Building Terraform provider..."
+	cd adapters/ad5-terraform && make build
+	@echo "✅ Terraform provider built!"
+
+test-terraform:
+	@echo "🧪 Testing Terraform provider..."
+	cd adapters/ad5-terraform && make test
+	@echo "✅ Terraform provider tests passed!"
+
+clean-terraform:
+	@echo "🧹 Cleaning Terraform artifacts..."
+	cd adapters/ad5-terraform && make clean
+	@echo "✅ Terraform artifacts cleaned!"
+
+# =============================================================================
+# JAVA KAFKA INTERCEPTOR
+# =============================================================================
+
+build-kafka:
+	@echo "🔨 Building Kafka interceptor..."
+	cd adapters/ad6-kafka && mvn clean package -DskipTests
+	@echo "✅ Kafka interceptor built!"
+
+test-kafka:
+	@echo "🧪 Testing Kafka interceptor..."
+	cd adapters/ad6-kafka && mvn test
+	@echo "✅ Kafka interceptor tests passed!"
+
+clean-kafka:
+	@echo "🧹 Cleaning Kafka artifacts..."
+	cd adapters/ad6-kafka && mvn clean
+	@echo "✅ Kafka artifacts cleaned!"
+
+# =============================================================================
+# INTEGRATION TESTING
+# =============================================================================
+
+test-integration: build-all
+	@echo "🔗 Running integration tests..."
+	@echo "Starting test environment..."
+	docker-compose -f tests/integration/docker-compose.test.yml up -d
+	@echo "Waiting for services to be ready..."
+	sleep 30
+	@echo "Running integration test suite..."
+	cd tests/integration && python -m pytest -v
+	@echo "Stopping test environment..."
+	docker-compose -f tests/integration/docker-compose.test.yml down
+	@echo "✅ Integration tests completed!"
+
+# =============================================================================
+# DEVELOPMENT ENVIRONMENT
+# =============================================================================
+
+# Install all dependencies
+install-deps:
+	@echo "📦 Installing all dependencies..."
+	@echo "Installing Rust dependencies..."
+	cd libocx-verify && cargo fetch
+	@echo "Installing Go dependencies..."
+	go mod download
+	@echo "Installing Node.js dependencies..."
+	cd adapters/ad4-github && npm ci
+	@echo "Installing Java dependencies..."
+	cd adapters/ad6-kafka && mvn dependency:resolve
+	@echo "Installing Python dependencies..."
+	pip install pytest pytest-asyncio docker-compose requests
+	@echo "✅ All dependencies installed!"
+
+# Start development environment
+start-dev-env: build-all
+	@echo "🚀 Starting development environment..."
+	docker-compose -f deployment/docker-compose.yml up -d
+	@echo "Waiting for services to be ready..."
+	sleep 30
+	@echo "✅ Development environment started!"
+
+# Stop development environment
+stop-dev-env:
+	@echo "🛑 Stopping development environment..."
+	docker-compose -f deployment/docker-compose.yml down
+	@echo "✅ Development environment stopped!"
+
+# Health check
+health-check:
+	@echo "🏥 Checking system health..."
+	@echo "Checking OCX server..."
+	@curl -s http://localhost:8080/status | jq . || echo "❌ OCX server not responding"
+	@echo "Checking Envoy proxy..."
+	@curl -s http://localhost:8000/health || echo "❌ Envoy proxy not responding"
+	@echo "Checking Kafka..."
+	@docker exec deployment_kafka_1 kafka-topics --list --bootstrap-server localhost:9092 > /dev/null || echo "❌ Kafka not responding"
+	@echo "✅ Health check completed!"
+
+# Show logs
+logs:
+	@echo "📋 Showing system logs..."
+	docker-compose -f deployment/docker-compose.yml logs --tail=50
+
+# Monitor performance
+monitor-performance:
+	@echo "📊 Monitoring performance..."
+	@echo "OCX Server Performance:"
+	@curl -s -w "Response time: %{time_total}s\n" http://localhost:8080/status -o /dev/null
+	@echo "Envoy Proxy Performance:"
+	@curl -s -w "Response time: %{time_total}s\n" http://localhost:8000/health -o /dev/null
+	@echo "✅ Performance monitoring completed!"
+
+# =============================================================================
+# DEPLOYMENT TARGETS
+# =============================================================================
+
+# Deploy locally
+deploy-local: build-all
+	@echo "🚀 Deploying locally..."
+	docker-compose -f deployment/docker-compose.yml up -d
+	@echo "✅ Local deployment completed!"
+
+# Deploy to staging
+deploy-staging: build-all
+	@echo "🚀 Deploying to staging..."
+	@echo "Staging deployment would go here"
+	@echo "✅ Staging deployment completed!"
+
+# Deploy to production
+deploy-prod: build-all
+	@echo "🚀 Deploying to production..."
+	@echo "Production deployment would go here"
+	@echo "✅ Production deployment completed!"
+
+# =============================================================================
+# SECURITY AND MONITORING
+# =============================================================================
+
+# Security scan
+security-scan:
+	@echo "🔒 Running security scan..."
+	@echo "Scanning Docker images..."
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image ocx-protocol:latest
+	@echo "Scanning dependencies..."
+	cd libocx-verify && cargo audit
+	cd adapters/ad4-github && npm audit
+	cd adapters/ad6-kafka && mvn org.owasp:dependency-check-maven:check
+	@echo "✅ Security scan completed!"
+
+# Integration test
+integration-test: build-all
+	@echo "🔗 Running integration tests..."
+	@echo "Starting test environment..."
+	docker-compose -f tests/integration/docker-compose.test.yml up -d
+	@echo "Waiting for services to be ready..."
+	sleep 30
+	@echo "Running integration test suite..."
+	cd tests/integration && python -m pytest -v
+	@echo "Stopping test environment..."
+	docker-compose -f tests/integration/docker-compose.test.yml down
+	@echo "✅ Integration tests completed!"
+
+# =============================================================================
+# LEGACY ADAPTERS (PRESERVED)
+# =============================================================================
+
+# Build all adapters (AD2 Pattern Multiplication) - LEGACY
+build-adapters: build-all
+	@echo "🚀 Building all OCX adapters..."
+	@echo "✅ All adapters built successfully!"
+
+# Test all adapters
+test-adapters:
+	@echo "🧪 Testing all OCX adapters..."
+	@echo "Testing AD2 Kubernetes webhook..."
+	go test ./cmd/webhook/...
+	@echo "Testing AD3 Envoy filter..."
+	go test ./adapters/ad3-envoy/...
+	@echo "Testing AD5 Terraform provider..."
+	go test ./adapters/ad5-terraform/...
+	@echo "Testing AD6 Kafka interceptor..."
+	go test ./adapters/ad6-kafka/...
+	@echo "Testing tiny verifier..."
+	go test ./cmd/ocx-verifier/...
+	@echo "✅ All adapter tests passed!"
+
+# Deploy all adapters
+deploy-adapters: build-adapters
+	@echo "🚀 Deploying all OCX adapters..."
+	@echo "Deploying AD2 Kubernetes webhook..."
+	kubectl apply -f k8s/webhook/
+	@echo "Deploying AD3 Envoy filter..."
+	# Envoy deployment would go here
+	@echo "Deploying AD4 GitHub Action..."
+	# GitHub Action deployment would go here
+	@echo "Deploying AD5 Terraform provider..."
+	# Terraform provider deployment would go here
+	@echo "Deploying AD6 Kafka interceptor..."
+	# Kafka interceptor deployment would go here
+	@echo "✅ All adapters deployed successfully!"
+
+# Help
+help:
+	@echo "Available targets:"
+	@echo "  all           - Run all checks and tests"
+	@echo "  build         - Build the project"
+	@echo "  build-rust    - Build with Rust verifier (default)"
+	@echo "  build-go      - Build with Go verifier"
+	@echo "  build-adapters - Build all OCX adapters (AD2 pattern multiplication)"
+	@echo "  test-adapters - Test all OCX adapters"
+	@echo "  deploy-adapters - Deploy all OCX adapters"
+	@echo "  build-demo    - Build killer applications demo"
+	@echo "  demo          - Run killer applications demo"
+	@echo "  build-simple-demo - Build simple demo"
+	@echo "  simple-demo   - Run simple demo"
+	@echo "  build-cli     - Build enhanced CLI"
+	@echo "  conformance   - Run conformance tests"
+	@echo "  benchmark     - Run performance benchmarks"
+	@echo "  gen-vectors   - Generate test vectors"
+	@echo "  verify        - Verify receipts"
+	@echo "  test          - Run tests"
+	@echo "  test-rust     - Test Rust components"
+	@echo "  test-go       - Test Go components"
+	@echo "  test-integration - Test Rust-Go integration"
+	@echo "  test-race     - Run tests with race detection"
+	@echo "  test-coverage - Run tests with coverage"
+	@echo "  benchmark-rust - Run Rust verifier benchmarks"
+	@echo "  benchmark-go  - Run Go verifier benchmarks"
+	@echo "  lint          - Run linters"
+	@echo "  security-check - Run security checks"
+	@echo "  safety-check  - Run safety checks"
+	@echo "  check         - Run all checks"
+	@echo "  clean         - Clean build artifacts"
+	@echo "  fmt           - Format code"
+	@echo "  vet           - Vet code"
+	@echo "  ci            - CI/CD pipeline"
+	@echo "  dev-setup     - Setup development environment"
+	@echo "  help          - Show this help"

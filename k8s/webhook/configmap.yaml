@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ocx-webhook-config
+  namespace: ocx-system
+  labels:
+    app.kubernetes.io/name: ocx-webhook
+    app.kubernetes.io/part-of: ocx-system
+data:
+  config.yaml: |
+    webhook:
+      port: 8443
+      metricsPort: 9090
+      debugMode: false
+      ocxServerURL: "http://ocx-server.ocx-system.svc.cluster.local:8080"
+    
+    injection:
+      defaultCycles: "10000"
+      defaultProfile: "v1-min"
+      defaultKeystore: "default"
+      ocxImage: "ocx-protocol:latest"
+    
+    security:
+      minTLSVersion: "1.2"
+      timeouts:
+        read: "30s"
+        write: "30s"
+        idle: "60s"

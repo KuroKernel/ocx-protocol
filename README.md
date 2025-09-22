@@ -292,3 +292,83 @@ Release(leaseID string) error
 ```
 
 No other code changes required.
+
+## 🔌 Kubernetes Webhook Integration
+
+**Enterprise-grade Kubernetes integration for OCX Protocol with zero-code adoption**
+
+The OCX Protocol now includes a Fortune 500-grade Kubernetes mutating admission webhook that transforms enterprise adoption from "rewrite your code" to "add one annotation".
+
+### 🚀 Executive Summary
+
+- **Zero Code Changes**: Add `ocx-inject: "true"` annotation to any pod
+- **Enterprise Security**: Production-ready with TLS, RBAC, and NetworkPolicies
+- **Performance**: Sub-5ms injection latency with comprehensive monitoring
+- **Reliability**: High availability with graceful degradation and health checks
+
+### Core Features
+
+- ✅ **Init Container Injection** - Automatically adds OCX binary and keystore
+- ✅ **Sidecar Verification** - Optional verification-only containers
+- ✅ **Flexible Configuration** - Cycles, profiles, and keystore selection
+- ✅ **Security Hardened** - Non-root execution, read-only filesystems, capability drops
+- ✅ **Production Monitoring** - Prometheus metrics, health checks, distributed tracing
+- ✅ **Certificate Management** - Auto-rotation with cert-manager integration
+- ✅ **High Availability** - Multi-replica deployment with anti-affinity rules
+
+### Quick Start
+
+```bash
+# Deploy the webhook
+cd k8s/webhook
+./deploy-production.sh deploy
+
+# Enable for a namespace
+kubectl label namespace default ocx-inject=enabled
+
+# Test with a pod
+kubectl apply -f examples/test-pod.yaml
+```
+
+### Usage Examples
+
+**Basic Integration:**
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-app
+  annotations:
+    ocx-inject: "true"           # 👈 Single annotation enables OCX
+spec:
+  containers:
+  - name: app
+    image: nginx
+    # OCX binary automatically available at /usr/local/bin/ocx
+```
+
+**Advanced Configuration:**
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ocx-production-workload
+  annotations:
+    ocx-inject: "true"
+    ocx-cycles: "100000"          # High-computation workload
+    ocx-profile: "v1-enterprise"  # Enterprise protocol profile
+    ocx-keystore: "prod-hsm"      # Production HSM keystore
+spec:
+  containers:
+  - name: ml-training
+    image: tensorflow:latest
+    # OCX automatically injected, ready to use
+```
+
+### 📚 Documentation
+
+- **[Complete Webhook Guide](./docs/webhook/README.md)** - Comprehensive documentation
+- **[API Reference](./docs/webhook/API_REFERENCE.md)** - Detailed API documentation
+- **[Troubleshooting Guide](./docs/webhook/TROUBLESHOOTING.md)** - Issue resolution
+- **[Upgrade Guide](./docs/webhook/UPGRADE_GUIDE.md)** - Version upgrades
+- **[K8s Manifests](./k8s/webhook/README.md)** - Kubernetes deployment

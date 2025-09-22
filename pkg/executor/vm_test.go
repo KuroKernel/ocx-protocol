@@ -21,11 +21,17 @@ var ConformanceVectors = []ConformanceTest{
 		Name: "simple_addition",
 		Input: OCXInput{
 			Code: []byte{
-				byte(OP_LOAD), 0, 0, 0, 0, // LOAD from address 0
-				byte(OP_LOAD), 8, 0, 0, 0, // LOAD from address 8
-				byte(OP_ADD),              // ADD
-				byte(OP_STORE), 16, 0, 0, 0, // STORE to address 16
-				byte(OP_HALT),             // HALT
+				// Push address 0, load value
+				byte(OP_PUSH), 0, 0, 0, 0, 0, 0, 0, 0, // Push 0
+				byte(OP_LOAD), // Load from address 0
+				// Push address 8, load value
+				byte(OP_PUSH), 8, 0, 0, 0, 0, 0, 0, 0, // Push 8
+				byte(OP_LOAD), // Load from address 8
+				byte(OP_ADD),  // ADD
+				// Push address 16, store result
+				byte(OP_PUSH), 16, 0, 0, 0, 0, 0, 0, 0, // Push 16
+				byte(OP_STORE), // Store to address 16
+				byte(OP_HALT), // HALT
 			},
 			Data:      makeTestData(5, 7),
 			MaxCycles: 1000,
@@ -36,11 +42,14 @@ var ConformanceVectors = []ConformanceTest{
 		Name: "multiplication",
 		Input: OCXInput{
 			Code: []byte{
-				byte(OP_LOAD), 0, 0, 0, 0, // LOAD from address 0
-				byte(OP_LOAD), 8, 0, 0, 0, // LOAD from address 8
-				byte(OP_MUL),              // MUL
-				byte(OP_STORE), 16, 0, 0, 0, // STORE to address 16
-				byte(OP_HALT),             // HALT
+				byte(OP_PUSH), 0, 0, 0, 0, 0, 0, 0, 0, // Push 0
+				byte(OP_LOAD), // Load from address 0
+				byte(OP_PUSH), 8, 0, 0, 0, 0, 0, 0, 0, // Push 8
+				byte(OP_LOAD), // Load from address 8
+				byte(OP_MUL),  // MUL
+				byte(OP_PUSH), 16, 0, 0, 0, 0, 0, 0, 0, // Push 16
+				byte(OP_STORE), // Store to address 16
+				byte(OP_HALT), // HALT
 			},
 			Data:      makeTestData(6, 7),
 			MaxCycles: 1000,
@@ -51,11 +60,14 @@ var ConformanceVectors = []ConformanceTest{
 		Name: "division",
 		Input: OCXInput{
 			Code: []byte{
-				byte(OP_LOAD), 0, 0, 0, 0, // LOAD from address 0
-				byte(OP_LOAD), 8, 0, 0, 0, // LOAD from address 8
-				byte(OP_DIV),              // DIV
-				byte(OP_STORE), 16, 0, 0, 0, // STORE to address 16
-				byte(OP_HALT),             // HALT
+				byte(OP_PUSH), 0, 0, 0, 0, 0, 0, 0, 0, // Push 0
+				byte(OP_LOAD), // Load from address 0
+				byte(OP_PUSH), 8, 0, 0, 0, 0, 0, 0, 0, // Push 8
+				byte(OP_LOAD), // Load from address 8
+				byte(OP_DIV),  // DIV
+				byte(OP_PUSH), 16, 0, 0, 0, 0, 0, 0, 0, // Push 16
+				byte(OP_STORE), // Store to address 16
+				byte(OP_HALT), // HALT
 			},
 			Data:      makeTestData(84, 2),
 			MaxCycles: 1000,
@@ -66,10 +78,12 @@ var ConformanceVectors = []ConformanceTest{
 		Name: "hash_operation",
 		Input: OCXInput{
 			Code: []byte{
-				byte(OP_LOAD), 0, 0, 0, 0, // LOAD from address 0
-				byte(OP_HASH),             // HASH
-				byte(OP_STORE), 8, 0, 0, 0, // STORE to address 8
-				byte(OP_HALT),             // HALT
+				byte(OP_PUSH), 0, 0, 0, 0, 0, 0, 0, 0, // Push 0
+				byte(OP_LOAD), // Load from address 0
+				byte(OP_HASH), // HASH
+				byte(OP_PUSH), 8, 0, 0, 0, 0, 0, 0, 0, // Push 8
+				byte(OP_STORE), // Store to address 8
+				byte(OP_HALT), // HALT
 			},
 			Data:      makeTestData(42, 0),
 			MaxCycles: 1000,
@@ -101,10 +115,11 @@ func TestConformanceVectors(t *testing.T) {
 			}
 			
 			// Verify deterministic pricing
+			// VM allocates 1MB = 1024*1024 bytes = 256 pages
 			expectedPrice := calculatePrice(
 				result.Receipt.CyclesUsed,
 				uint64(len(test.Input.Data) + len(result.Output)),
-				uint64(len(result.Output) / 4096),
+				256, // 1MB memory allocation = 256 pages
 			)
 			if result.Receipt.Price != expectedPrice {
 				t.Fatalf("Price mismatch: expected %d, got %d", expectedPrice, result.Receipt.Price)
@@ -117,10 +132,13 @@ func TestConformanceVectors(t *testing.T) {
 func TestDeterminism(t *testing.T) {
 	input := OCXInput{
 		Code: []byte{
-			byte(OP_LOAD), 0, 0, 0, 0,
-			byte(OP_LOAD), 8, 0, 0, 0,
+			byte(OP_PUSH), 0, 0, 0, 0, 0, 0, 0, 0,
+			byte(OP_LOAD),
+			byte(OP_PUSH), 8, 0, 0, 0, 0, 0, 0, 0,
+			byte(OP_LOAD),
 			byte(OP_ADD),
-			byte(OP_STORE), 16, 0, 0, 0,
+			byte(OP_PUSH), 16, 0, 0, 0, 0, 0, 0, 0,
+			byte(OP_STORE),
 			byte(OP_HALT),
 		},
 		Data:      makeTestData(5, 7),
@@ -160,12 +178,15 @@ func TestDeterminism(t *testing.T) {
 
 // TestCycleLimits ensures cycle limits are enforced
 func TestCycleLimits(t *testing.T) {
-	// Create infinite loop code
+	// Create infinite loop code - just keep adding 1
 	code := []byte{
-		byte(OP_LOAD), 0, 0, 0, 0, // LOAD from address 0
-		byte(OP_LOAD), 8, 0, 0, 0, // LOAD from address 8
-		byte(OP_ADD),              // ADD
-		byte(OP_JUMP), 0, 0, 0, 0, // JUMP to start (infinite loop)
+		byte(OP_PUSH), 1, 0, 0, 0, 0, 0, 0, 0, // Push 1
+		byte(OP_PUSH), 1, 0, 0, 0, 0, 0, 0, 0, // Push 1
+		byte(OP_ADD),  // ADD (1+1=2)
+		byte(OP_PUSH), 0, 0, 0, 0, 0, 0, 0, 0, // Push 0 (jump address)
+		byte(OP_PUSH), 1, 0, 0, 0, 0, 0, 0, 0, // Push 1 (condition - always true)
+		byte(OP_JUMP), // JUMP to start (infinite loop)
+		byte(OP_HALT), // This should never be reached
 	}
 	
 	input := OCXInput{
@@ -186,7 +207,8 @@ func TestCycleLimits(t *testing.T) {
 // TestMemoryBounds ensures memory access is bounds-checked
 func TestMemoryBounds(t *testing.T) {
 	code := []byte{
-		byte(OP_LOAD), 0xFF, 0xFF, 0xFF, 0xFF, // LOAD from invalid address
+		byte(OP_PUSH), 0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0, // Push invalid address
+		byte(OP_LOAD), // LOAD from invalid address
 		byte(OP_HALT),
 	}
 	
@@ -208,9 +230,11 @@ func TestMemoryBounds(t *testing.T) {
 // TestDivisionByZero ensures division by zero is handled
 func TestDivisionByZero(t *testing.T) {
 	code := []byte{
-		byte(OP_LOAD), 0, 0, 0, 0, // LOAD from address 0
-		byte(OP_LOAD), 8, 0, 0, 0, // LOAD from address 8
-		byte(OP_DIV),              // DIV
+		byte(OP_PUSH), 0, 0, 0, 0, 0, 0, 0, 0, // Push 0
+		byte(OP_LOAD), // Load from address 0
+		byte(OP_PUSH), 8, 0, 0, 0, 0, 0, 0, 0, // Push 8
+		byte(OP_LOAD), // Load from address 8
+		byte(OP_DIV),  // DIV
 		byte(OP_HALT),
 	}
 	

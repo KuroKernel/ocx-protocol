@@ -1,0 +1,384 @@
+name: OCX Protocol Build & Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  GO_VERSION: '1.21'
+  NODE_VERSION: '20'
+  JAVA_VERSION: '17'
+
+jobs:
+  # =============================================================================
+  # RUST VERIFIER
+  # =============================================================================
+  rust:
+    name: Rust Verifier
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+          
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            libocx-verify/target
+          key: ${{ runner.os }}-rust-${{ hashFiles('**/Cargo.lock') }}
+          
+      - name: Build Rust verifier
+        run: |
+          cd libocx-verify
+          cargo build --release --features ffi
+          
+      - name: Test Rust verifier
+        run: |
+          cd libocx-verify
+          cargo test --features ffi
+          
+      - name: Run Rust benchmarks
+        run: |
+          cd libocx-verify
+          cargo bench --features ffi
+          
+      - name: Upload Rust artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: rust-verifier
+          path: |
+            libocx-verify/target/release/libocx_verify.a
+            libocx-verify/target/release/libocx_verify.so
+
+  # =============================================================================
+  # GO COMPONENTS
+  # =============================================================================
+  go:
+    name: Go Components
+    runs-on: ubuntu-latest
+    needs: rust
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          
+      - name: Download Rust artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: rust-verifier
+          path: libocx-verify/target/release/
+          
+      - name: Build Go components
+        run: |
+          go build -tags rust_verifier -ldflags="-w -s" -o bin/ocx-server ./cmd/server
+          go build -o bin/ad2-webhook ./cmd/ocx-webhook
+          go build -o bin/ocx-verifier ./cmd/ocx-verifier
+          
+      - name: Test Go components
+        run: |
+          go test -v -timeout=30s ./...
+          
+      - name: Run Go benchmarks
+        run: |
+          go test -bench=. ./pkg/verify/...
+          
+      - name: Upload Go artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: go-components
+          path: bin/
+
+  # =============================================================================
+  # C++ ENVOY FILTER
+  # =============================================================================
+  envoy:
+    name: Envoy Filter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            libprotobuf-dev \
+            protobuf-compiler \
+            libgrpc++-dev \
+            libgrpc-dev \
+            protobuf-compiler-grpc \
+            nlohmann-json3-dev \
+            libgtest-dev
+          
+      - name: Build Envoy filter
+        run: |
+          cd adapters/ad3-envoy
+          make build
+          
+      - name: Test Envoy filter
+        run: |
+          cd adapters/ad3-envoy
+          make test
+          
+      - name: Upload Envoy artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: envoy-filter
+          path: adapters/ad3-envoy/libocx_filter.so
+
+  # =============================================================================
+  # NODE.JS GITHUB ACTION
+  # =============================================================================
+  github-action:
+    name: GitHub Action
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: adapters/ad4-github/package-lock.json
+          
+      - name: Install dependencies
+        run: |
+          cd adapters/ad4-github
+          npm ci
+          
+      - name: Build GitHub Action
+        run: |
+          cd adapters/ad4-github
+          npm run build
+          
+      - name: Test GitHub Action
+        run: |
+          cd adapters/ad4-github
+          npm test
+          
+      - name: Upload GitHub Action artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: github-action
+          path: adapters/ad4-github/dist/
+
+  # =============================================================================
+  # TERRAFORM PROVIDER
+  # =============================================================================
+  terraform:
+    name: Terraform Provider
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+          
+      - name: Build Terraform provider
+        run: |
+          cd adapters/ad5-terraform
+          make build
+          
+      - name: Test Terraform provider
+        run: |
+          cd adapters/ad5-terraform
+          make test
+          
+      - name: Upload Terraform artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-provider
+          path: adapters/ad5-terraform/bin/
+
+  # =============================================================================
+  # JAVA KAFKA INTERCEPTOR
+  # =============================================================================
+  kafka:
+    name: Kafka Interceptor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          
+      - name: Build Kafka interceptor
+        run: |
+          cd adapters/ad6-kafka
+          mvn clean package -DskipTests
+          
+      - name: Test Kafka interceptor
+        run: |
+          cd adapters/ad6-kafka
+          mvn test
+          
+      - name: Upload Kafka artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: kafka-interceptor
+          path: adapters/ad6-kafka/target/
+
+  # =============================================================================
+  # INTEGRATION TESTS
+  # =============================================================================
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [rust, go, envoy, github-action, terraform, kafka]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          
+      - name: Install Python dependencies
+        run: |
+          pip install pytest pytest-asyncio docker-compose
+          
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts/
+          
+      - name: Run integration tests
+        run: |
+          cd tests/integration
+          python -m pytest -v --tb=short
+          
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results
+          path: tests/integration/test-results/
+
+  # =============================================================================
+  # SECURITY SCANNING
+  # =============================================================================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # =============================================================================
+  # DOCKER BUILD
+  # =============================================================================
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [rust, go, envoy, github-action, terraform, kafka]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+          
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.complete
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ocx-protocol:latest
+            ocx-protocol:${{ github.sha }}
+            ocx-protocol:${{ github.ref_name }}
+
+  # =============================================================================
+  # RELEASE
+  # =============================================================================
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [integration, security, docker]
+    if: github.event_name == 'release'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts/
+          
+      - name: Create release package
+        run: |
+          mkdir -p release
+          cp -r artifacts/* release/
+          tar -czf ocx-protocol-${{ github.ref_name }}.tar.gz release/
+          
+      - name: Upload release assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.upload_url }}
+          asset_path: ./ocx-protocol-${{ github.ref_name }}.tar.gz
+          asset_name: ocx-protocol-${{ github.ref_name }}.tar.gz
+          asset_content_type: application/gzip

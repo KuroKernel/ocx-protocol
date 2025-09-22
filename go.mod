@@ -21,14 +21,3 @@ require (
 	google.golang.org/protobuf v1.32.0 // indirect
 )
 
-replace ocx.local/pkg/executor => ./pkg/executor
-
-replace ocx.local/pkg/programs => ./pkg/programs
-
-replace ocx.local/pkg/ocx => ./pkg/ocx
-
-replace ocx.local/pkg/receipt => ./pkg/receipt
-
-replace ocx.local/conformance => ./conformance
-
-replace ocx.local/store => ./store

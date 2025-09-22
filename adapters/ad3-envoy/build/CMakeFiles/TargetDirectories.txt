@@ -1,0 +1,7 @@
+/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad3-envoy/build/CMakeFiles/ocx_envoy_filter.dir
+/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad3-envoy/build/CMakeFiles/edit_cache.dir
+/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad3-envoy/build/CMakeFiles/rebuild_cache.dir
+/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad3-envoy/build/CMakeFiles/list_install_components.dir
+/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad3-envoy/build/CMakeFiles/install.dir
+/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad3-envoy/build/CMakeFiles/install/local.dir
+/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad3-envoy/build/CMakeFiles/install/strip.dir

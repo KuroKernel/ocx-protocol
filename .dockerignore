@@ -1,0 +1,14 @@
+.git
+.gitignore
+README.md
+Makefile
+docs/
+examples/
+scripts/
+k8s/
+certs/
+bin/
+coverage.out
+coverage.html
+*.log
+.DS_Store

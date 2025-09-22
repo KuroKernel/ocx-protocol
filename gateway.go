@@ -18,6 +18,7 @@ import (
 	"ocx.local/store"
 	"ocx.local/pkg/ocx"
 	"ocx.local/pkg/receipt"
+	"ocx.local/pkg/verify"
 	"ocx.local/internal/api"
 )
 
@@ -581,14 +582,24 @@ func (g *Gateway) HandleVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Deserialize and verify receipt
+	// Use unified verifier (Go or Rust based on environment)
+	valid, err := verify.VerifyReceiptUnified(receiptBytes)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Verification failed: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// For response, we still need to deserialize to get receipt details
 	receiptWrapper, err := receipt.Deserialize(receiptBytes)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to deserialize receipt: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	valid, reason := receiptWrapper.Verify()
+	reason := "invalid"
+	if valid {
+		reason = "valid"
+	}
 	
 	response := map[string]interface{}{
 		"valid":   valid,

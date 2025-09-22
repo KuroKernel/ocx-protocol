@@ -45,15 +45,16 @@ type OCXInstruction byte
 
 const (
 	OP_NOP    OCXInstruction = 0x00
-	OP_LOAD   OCXInstruction = 0x01 // Load from memory
-	OP_STORE  OCXInstruction = 0x02 // Store to memory
-	OP_ADD    OCXInstruction = 0x03 // Integer addition
-	OP_SUB    OCXInstruction = 0x04 // Integer subtraction
-	OP_MUL    OCXInstruction = 0x05 // Integer multiplication
-	OP_DIV    OCXInstruction = 0x06 // Integer division
-	OP_MOD    OCXInstruction = 0x07 // Modulo
-	OP_HASH   OCXInstruction = 0x08 // SHA256 hash
-	OP_JUMP   OCXInstruction = 0x09 // Conditional jump
+	OP_PUSH   OCXInstruction = 0x01 // Push immediate value
+	OP_LOAD   OCXInstruction = 0x02 // Load from memory
+	OP_STORE  OCXInstruction = 0x03 // Store to memory
+	OP_ADD    OCXInstruction = 0x04 // Integer addition
+	OP_SUB    OCXInstruction = 0x05 // Integer subtraction
+	OP_MUL    OCXInstruction = 0x06 // Integer multiplication
+	OP_DIV    OCXInstruction = 0x07 // Integer division
+	OP_MOD    OCXInstruction = 0x08 // Modulo
+	OP_HASH   OCXInstruction = 0x09 // SHA256 hash
+	OP_JUMP   OCXInstruction = 0x0A // Conditional jump
 	OP_HALT   OCXInstruction = 0xFF // Stop execution
 )
 
@@ -98,6 +99,15 @@ func (state *OCXState) step(code []byte) error {
 	switch instruction {
 	case OP_NOP:
 		// Do nothing
+		
+	case OP_PUSH:
+		// Push immediate 8-byte value from instruction stream
+		if state.PC+8 > uint32(len(code)) {
+			return fmt.Errorf("instruction stream truncated")
+		}
+		value := binary.LittleEndian.Uint64(code[state.PC : state.PC+8])
+		state.PC += 8
+		state.pushStack(value)
 		
 	case OP_LOAD:
 		addr := state.popStack()

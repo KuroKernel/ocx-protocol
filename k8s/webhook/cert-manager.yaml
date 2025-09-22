@@ -1,0 +1,49 @@
+# cert-manager Certificate (if cert-manager is installed)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ocx-webhook-cert
+  namespace: ocx-system
+  labels:
+    app.kubernetes.io/name: ocx-webhook
+    app.kubernetes.io/part-of: ocx-system
+spec:
+  secretName: ocx-webhook-certs
+  issuerRef:
+    name: ocx-webhook-issuer
+    kind: ClusterIssuer
+  dnsNames:
+  - ocx-webhook.ocx-system.svc
+  - ocx-webhook.ocx-system.svc.cluster.local
+
+---
+# cert-manager ClusterIssuer (self-signed for development)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ocx-webhook-issuer
+  labels:
+    app.kubernetes.io/name: ocx-webhook
+    app.kubernetes.io/part-of: ocx-system
+spec:
+  selfSigned: {}
+
+---
+# Production ClusterIssuer (Let's Encrypt)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ocx-webhook-issuer-prod
+  labels:
+    app.kubernetes.io/name: ocx-webhook
+    app.kubernetes.io/part-of: ocx-system
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@your-domain.com  # CHANGE THIS
+    privateKeySecretRef:
+      name: ocx-webhook-issuer-account-key
+    solvers:
+    - http01:
+        ingress:
+          class: nginx

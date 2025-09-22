@@ -1,0 +1,16 @@
+/home/kurokernel/Desktop/AXIS/ocx-protocol/libocx-verify/target/release/deps/libocx_verify.d: src/lib.rs src/canonical_cbor.rs src/error.rs src/receipt.rs src/verify.rs src/ffi.rs
+
+/home/kurokernel/Desktop/AXIS/ocx-protocol/libocx-verify/target/release/deps/liblibocx_verify.so: src/lib.rs src/canonical_cbor.rs src/error.rs src/receipt.rs src/verify.rs src/ffi.rs
+
+/home/kurokernel/Desktop/AXIS/ocx-protocol/libocx-verify/target/release/deps/liblibocx_verify.a: src/lib.rs src/canonical_cbor.rs src/error.rs src/receipt.rs src/verify.rs src/ffi.rs
+
+/home/kurokernel/Desktop/AXIS/ocx-protocol/libocx-verify/target/release/deps/liblibocx_verify.rlib: src/lib.rs src/canonical_cbor.rs src/error.rs src/receipt.rs src/verify.rs src/ffi.rs
+
+src/lib.rs:
+src/canonical_cbor.rs:
+src/error.rs:
+src/receipt.rs:
+src/verify.rs:
+src/ffi.rs:
+
+# env-dep:CARGO_PKG_VERSION=0.1.0

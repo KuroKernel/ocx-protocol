@@ -1,0 +1,34 @@
+name: 'OCX Provenance Verification'
+description: 'Generate cryptographic receipts for GitHub Actions job steps'
+author: 'OCX Protocol'
+
+inputs:
+  artifact-path:
+    description: 'Path to artifacts to verify'
+    required: true
+  ocx-server-url:
+    description: 'OCX server URL'
+    required: true
+  api-key:
+    description: 'OCX API key'
+    required: true
+  step-name:
+    description: 'Name of the step being verified'
+    required: false
+    default: ${{ github.job }}
+  fail-on-error:
+    description: 'Fail the action if verification fails'
+    required: false
+    default: 'true'
+
+outputs:
+  receipt-url:
+    description: 'URL to the generated receipt artifact'
+  verification-status:
+    description: 'Verification status (success/failure)'
+  receipt-hash:
+    description: 'SHA-256 hash of the receipt'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

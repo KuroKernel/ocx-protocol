@@ -1,9 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Check, Hash } from 'lucide-react';
+import Specification from './pages/Specification';
+import Pricing from './pages/Pricing';
+import Documentation from './pages/Documentation';
+import About from './pages/About';
+import Contact from './pages/Contact';
+import APIReference from './pages/APIReference';
+import Status from './pages/Status';
+import Support from './pages/Support';
+import TestPage from './pages/TestPage';
 
 const API_BASE = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001';
 
 const OCXLanding = () => {
+  const [currentPage, setCurrentPage] = useState('home');
   const [demoResult, setDemoResult] = useState(null);
   const [verifyResult, setVerifyResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -68,8 +78,40 @@ const OCXLanding = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-white">
+  const navigateToPage = (page) => {
+    console.log('Navigating to page:', page);
+    setCurrentPage(page);
+    window.scrollTo(0, 0);
+  };
+
+  const renderPage = () => {
+    console.log('Current page:', currentPage);
+    if (currentPage === 'specification') {
+      return <Specification />;
+    } else if (currentPage === 'pricing') {
+      return <Pricing />;
+    } else if (currentPage === 'documentation') {
+      return <Documentation />;
+    } else if (currentPage === 'about') {
+      return <About />;
+    } else if (currentPage === 'contact') {
+      return <Contact />;
+    } else if (currentPage === 'api-reference') {
+      return <APIReference />;
+    } else if (currentPage === 'status') {
+      return <Status />;
+    } else if (currentPage === 'support') {
+      return <Support />;
+    } else if (currentPage === 'test') {
+      return <TestPage />;
+    } else {
+      return renderHomeContent();
+    }
+  };
+
+  const renderHomeContent = () => {
+    return (
+      <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="fixed top-0 w-full bg-white/90 backdrop-blur-sm border-b border-gray-100 z-50">
         <div className="max-w-6xl mx-auto px-8 py-6">
@@ -83,11 +125,26 @@ const OCXLanding = () => {
               <span className="text-lg font-medium tracking-tight">OCX Protocol</span>
             </div>
             <nav className="hidden md:flex items-center space-x-12">
-              <a href="#specification" className="text-gray-600 hover:text-black transition-colors">Specification</a>
-              <a href="#pricing" className="text-gray-600 hover:text-black transition-colors">Pricing</a>
-              <a href="#documentation" className="text-gray-600 hover:text-black transition-colors">Documentation</a>
               <button 
-                onClick={handleExecute}
+                onClick={() => navigateToPage('specification')} 
+                className="text-gray-600 hover:text-black transition-colors"
+              >
+                Specification
+              </button>
+              <button 
+                onClick={() => navigateToPage('pricing')} 
+                className="text-gray-600 hover:text-black transition-colors"
+              >
+                Pricing
+              </button>
+              <button 
+                onClick={() => navigateToPage('documentation')} 
+                className="text-gray-600 hover:text-black transition-colors"
+              >
+                Documentation
+              </button>
+              <button 
+                onClick={() => navigateToPage('contact')}
                 className="bg-black text-white px-6 py-2 rounded-sm hover:bg-gray-900 transition-colors"
               >
                 Start Building
@@ -114,15 +171,18 @@ const OCXLanding = () => {
             
             <div className="flex items-center space-x-8">
               <button 
-                onClick={handleExecute}
+                onClick={() => navigateToPage('contact')}
                 className="bg-black text-white px-10 py-4 rounded-sm hover:bg-gray-900 transition-all duration-200 flex items-center text-lg"
               >
                 Get Started
                 <ArrowRight className="w-5 h-5 ml-3" />
               </button>
-              <a href="#specification" className="text-gray-600 hover:text-black transition-colors text-lg border-b border-gray-300 pb-1">
+              <button 
+                onClick={() => navigateToPage('specification')} 
+                className="text-gray-600 hover:text-black transition-colors text-lg border-b border-gray-300 pb-1"
+              >
                 Read Specification
-              </a>
+              </button>
             </div>
           </div>
         </div>
@@ -179,24 +239,13 @@ const OCXLanding = () => {
               </div>
             </div>
             
-            <div className="bg-black text-green-400 p-10 rounded-sm font-mono text-base relative">
-              <div className="absolute -top-2 -right-2 w-4 h-4 bg-gray-200 rounded-full"></div>
-              <div className="absolute -bottom-2 -left-2 w-3 h-3 bg-gray-400 rounded"></div>
-              <div className="space-y-3">
-                <div className="text-gray-500">// Cryptographic Receipt</div>
-                <div>version: "v1-min"</div>
-                <div>artifact_hash: "2c26b46b68b68f86..."</div>
-                <div>input_hash: "48e80c4b8b405e38..."</div>
-                <div>output_hash: "0ff558246733602c..."</div>
-                <div>cycles: 423</div>
-                <div>transcript_root: "7c8199b723e2dab5..."</div>
-                <div>issuer_pubkey: "ed25519:6d4f5dc7..."</div>
-                <div>signature: "ed25519:3a6dd14e..."</div>
-                <div className="pt-6 text-green-400 flex items-center">
-                  <div className="w-3 h-3 bg-green-400 rounded-full mr-3"></div>
-                  VERIFIED
-                </div>
-              </div>
+            {/* OCX Graphics */}
+            <div className="w-full h-96 md:h-80 lg:h-96 rounded-lg overflow-hidden shadow-lg flex items-center justify-center">
+              <img 
+                src="/assets/ocxgraphics.gif" 
+                alt="OCX Protocol Graphics" 
+                className="w-full h-full object-cover rounded-lg"
+              />
             </div>
           </div>
         </div>
@@ -436,7 +485,10 @@ const OCXLanding = () => {
                   Community support
                 </li>
               </ul>
-              <button className="w-full border border-black text-black py-4 rounded-sm hover:bg-black hover:text-white transition-colors">
+              <button 
+                onClick={() => navigateToPage('contact')}
+                className="w-full border border-black text-black py-4 rounded-sm hover:bg-black hover:text-white transition-colors"
+              >
                 Start Building
               </button>
             </div>
@@ -465,7 +517,10 @@ const OCXLanding = () => {
                   Priority support
                 </li>
               </ul>
-              <button className="w-full bg-black text-white py-4 rounded-sm hover:bg-gray-900 transition-colors">
+              <button 
+                onClick={() => navigateToPage('contact')}
+                className="w-full bg-black text-white py-4 rounded-sm hover:bg-gray-900 transition-colors"
+              >
                 Start Trial
               </button>
             </div>
@@ -491,7 +546,10 @@ const OCXLanding = () => {
                   Dedicated support
                 </li>
               </ul>
-              <button className="w-full border border-black text-black py-4 rounded-sm hover:bg-black hover:text-white transition-colors">
+              <button 
+                onClick={() => navigateToPage('contact')}
+                className="w-full border border-black text-black py-4 rounded-sm hover:bg-black hover:text-white transition-colors"
+              >
                 Contact Sales
               </button>
             </div>
@@ -511,14 +569,11 @@ const OCXLanding = () => {
           </p>
           <div className="flex items-center justify-center space-x-8">
             <button 
-              onClick={handleExecute}
-              className="bg-white text-black px-10 py-4 rounded-sm hover:bg-gray-100 transition-colors text-lg"
+              onClick={() => navigateToPage('documentation')} 
+              className="text-gray-400 hover:text-white transition-colors border-b border-gray-600 pb-1 text-lg"
             >
-              Get Started
-            </button>
-            <a href="#documentation" className="text-gray-400 hover:text-white transition-colors border-b border-gray-600 pb-1 text-lg">
               View Documentation
-            </a>
+            </button>
           </div>
         </div>
       </section>
@@ -544,27 +599,27 @@ const OCXLanding = () => {
             <div>
               <h4 className="font-medium text-black mb-6">Product</h4>
               <ul className="space-y-4 text-gray-600">
-                <li><a href="#" className="hover:text-black transition-colors">Specification</a></li>
-                <li><a href="#" className="hover:text-black transition-colors">Documentation</a></li>
-                <li><a href="#" className="hover:text-black transition-colors">API Reference</a></li>
+                <li><button onClick={() => navigateToPage('specification')} className="hover:text-black transition-colors">Specification</button></li>
+                <li><button onClick={() => navigateToPage('documentation')} className="hover:text-black transition-colors">Documentation</button></li>
+                <li><button onClick={() => navigateToPage('api-reference')} className="hover:text-black transition-colors">API Reference</button></li>
               </ul>
             </div>
             
             <div>
               <h4 className="font-medium text-black mb-6">Company</h4>
               <ul className="space-y-4 text-gray-600">
-                <li><a href="#" className="hover:text-black transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-black transition-colors">Security</a></li>
-                <li><a href="#" className="hover:text-black transition-colors">Contact</a></li>
+                <li><button onClick={() => navigateToPage('about')} className="hover:text-black transition-colors">About</button></li>
+                <li><button onClick={() => navigateToPage('specification')} className="hover:text-black transition-colors">Security</button></li>
+                <li><button onClick={() => navigateToPage('contact')} className="hover:text-black transition-colors">Contact</button></li>
               </ul>
             </div>
             
             <div>
               <h4 className="font-medium text-black mb-6">Resources</h4>
               <ul className="space-y-4 text-gray-600">
-                <li><a href="#" className="hover:text-black transition-colors">GitHub</a></li>
-                <li><a href="#" className="hover:text-black transition-colors">Status</a></li>
-                <li><a href="#" className="hover:text-black transition-colors">Support</a></li>
+                <li><a href="https://github.com/ocx-protocol/ocx" className="hover:text-black transition-colors">GitHub</a></li>
+                <li><button onClick={() => navigateToPage('status')} className="hover:text-black transition-colors">Status</button></li>
+                <li><button onClick={() => navigateToPage('support')} className="hover:text-black transition-colors">Support</button></li>
               </ul>
             </div>
           </div>
@@ -576,6 +631,64 @@ const OCXLanding = () => {
           </div>
         </div>
       </footer>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Global Header */}
+      <header className="fixed top-0 w-full bg-white/90 backdrop-blur-sm border-b border-gray-100 z-50">
+        <div className="max-w-6xl mx-auto px-8 py-6">
+          <div className="flex items-center justify-between">
+            <button 
+              onClick={() => navigateToPage('home')}
+              className="flex items-center space-x-3 hover:opacity-80 transition-opacity"
+            >
+              <img 
+                src="/assets/logos/ocx-symbol-only.svg" 
+                alt="OCX Protocol" 
+                className="w-8 h-8"
+              />
+              <span className="text-lg font-medium tracking-tight">OCX Protocol</span>
+            </button>
+            <nav className="hidden md:flex items-center space-x-12">
+              <button 
+                onClick={() => navigateToPage('specification')} 
+                className={`transition-colors ${currentPage === 'specification' ? 'text-black' : 'text-gray-600 hover:text-black'}`}
+              >
+                Specification
+              </button>
+              <button 
+                onClick={() => navigateToPage('pricing')} 
+                className={`transition-colors ${currentPage === 'pricing' ? 'text-black' : 'text-gray-600 hover:text-black'}`}
+              >
+                Pricing
+              </button>
+              <button 
+                onClick={() => navigateToPage('documentation')} 
+                className={`transition-colors ${currentPage === 'documentation' ? 'text-black' : 'text-gray-600 hover:text-black'}`}
+              >
+                Documentation
+              </button>
+              <button 
+                onClick={() => navigateToPage('test')}
+                className="bg-red-500 text-white px-6 py-2 rounded-sm hover:bg-red-600 transition-colors mr-4"
+              >
+                Test
+              </button>
+              <button 
+                onClick={() => navigateToPage('contact')}
+                className="bg-black text-white px-6 py-2 rounded-sm hover:bg-gray-900 transition-colors"
+              >
+                Start Building
+              </button>
+            </nav>
+          </div>
+        </div>
+      </header>
+      
+      {renderPage()}
     </div>
   );
 };

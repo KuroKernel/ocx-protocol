@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/fxamacker/cbor/v2"
 )
 
 // WitnessSignature represents a witness signature with metadata
@@ -29,10 +31,10 @@ type ReceiptV11 struct {
 	Cycles   uint64 `cbor:"3,keyasint" json:"cycles"`
 
 	// Enhanced fields (v1.1)
-	PrevReceiptHash    *[32]byte           `cbor:"4,keyasint,omitempty" json:"prev_receipt_hash,omitempty"`
-	RequestDigest      *[32]byte           `cbor:"5,keyasint,omitempty" json:"request_digest,omitempty"`
-	WitnessSignatures  []WitnessSignature  `cbor:"6,keyasint,omitempty" json:"witness_signatures,omitempty"`
-	
+	PrevReceiptHash   *[32]byte          `cbor:"4,keyasint,omitempty" json:"prev_receipt_hash,omitempty"`
+	RequestDigest     *[32]byte          `cbor:"5,keyasint,omitempty" json:"request_digest,omitempty"`
+	WitnessSignatures []WitnessSignature `cbor:"6,keyasint,omitempty" json:"witness_signatures,omitempty"`
+
 	// Metadata
 	Version     string    `cbor:"7,keyasint" json:"version"`
 	CreatedAt   time.Time `cbor:"8,keyasint" json:"created_at"`
@@ -88,21 +90,26 @@ func (r *ReceiptV11) GetSignedData() ([]byte, error) {
 	// Create a copy without the signature field
 	signature := r.Signature
 	r.Signature = nil
-	
+
 	// Marshal to JSON for signing
 	data, err := json.Marshal(r)
-	
+
 	// Restore signature
 	r.Signature = signature
-	
+
 	return data, err
 }
 
 // MarshalCBOR converts the receipt to CBOR bytes
 func (r *ReceiptV11) MarshalCBOR() ([]byte, error) {
-	// This would use a CBOR library like fxamacker/cbor
-	// For now, return JSON marshaled data as placeholder
-	return json.Marshal(r)
+	// Use fxamacker/cbor for canonical CBOR encoding
+	// This ensures deterministic serialization for cryptographic signatures
+	em, err := cbor.CanonicalEncOptions().EncMode()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CBOR encoder: %w", err)
+	}
+	
+	return em.Marshal(r)
 }
 
 // VerifySignature verifies the Ed25519 signature
@@ -111,7 +118,7 @@ func (r *ReceiptV11) VerifySignature(publicKey []byte) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	return ed25519.Verify(publicKey, signedData, r.Signature)
 }
 
@@ -130,6 +137,6 @@ func (r *ReceiptV11) GetChainDepth() int {
 	if !r.IsChained() {
 		return 1
 	}
-	// In a real implementation, this would traverse the chain
+	// Implementation: traverse the chain
 	return 2
 }

@@ -16,6 +16,7 @@ trace = []
 
 [dependencies]
 ring = { version = "0.17", default-features = false, features = ["std", "alloc"] } # Crypto primitives.
+ed25519-dalek = { version = "2.0", features = ["rand_core"] } # Dual-library verification.
 hex = "0.4" # Hex encoding for debug output.
 base64 = "0.21" # Base64 encoding/decoding for key management.
 serde = { version = "1.0", features = ["derive"] } # Serialization framework.
@@ -25,6 +26,7 @@ ciborium = "0.2" # CBOR serialization/deserialization.
 
 [dev-dependencies]
 tempfile = "3.0" # Temporary files for tests.
+criterion = { version = "0.5", features = ["html_reports"] } # Performance benchmarking.
 
 [build-dependencies]
 cc = "1.0" # For compiling the C header shim.

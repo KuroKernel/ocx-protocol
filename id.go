@@ -1,7 +1,7 @@
 // id.go — OCX Identity & Key Management
 // go 1.22+
 
-package main
+package ocx
 
 import (
 	"crypto/ed25519"
@@ -223,7 +223,7 @@ func (km *KeyManager) UpdateKYC(partyID ID, kycRef *KYCRef) error {
 
 // generateULID generates a ULID (simplified version)
 func generateULID() ID {
-	// In production, use a proper ULID library
+	// Future enhancement: use a proper ULID library
 	// This is a simplified version for demo purposes
 	timestamp := time.Now().UnixMilli()
 	random := make([]byte, 10)

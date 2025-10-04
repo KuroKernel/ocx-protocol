@@ -3,38 +3,40 @@ package api
 import (
 	"net/http"
 	"time"
-
-	"ocx.local/pkg/metrics"
 )
 
 func (s *Server) MetricsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		
-		// Increment active connections
-		metrics.ActiveConnections.Inc()
-		defer metrics.ActiveConnections.Dec()
-		
+
+		// Note: Active connections tracking would be implemented with connection pooling
+		// metrics.ActiveConnections.Inc()
+		// defer metrics.ActiveConnections.Dec()
+
 		// Wrap response writer to capture status code
 		wrapped := &responseWriter{
 			ResponseWriter: w,
 			statusCode:     200,
 		}
-		
+
 		next.ServeHTTP(wrapped, r)
-		
+
 		// Record metrics based on endpoint
 		duration := time.Since(start)
-		
+
 		switch r.URL.Path {
 		case "/execute":
 			if wrapped.statusCode == 200 {
-				metrics.RecordExecution(0, duration, true) // Cycles will be set by handler
+				s.metrics.RecordRequest(r.Method, r.URL.Path, "200", duration, 0, 0)
 			} else {
-				metrics.RecordExecution(0, duration, false)
+				s.metrics.RecordRequest(r.Method, r.URL.Path, "error", duration, 0, 0)
 			}
 		case "/verify":
-			metrics.RecordVerification(duration, wrapped.statusCode == 200)
+			if wrapped.statusCode == 200 {
+				s.metrics.RecordVerify("go", "success", "", duration)
+			} else {
+				s.metrics.RecordVerify("go", "error", "http_error", duration)
+			}
 		}
 	})
 }

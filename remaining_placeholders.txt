@@ -1,0 +1,46 @@
+pkg/backup/backup_test.go:304:	// Create mock backup and recovery managers
+pkg/database/connection.go:63:// MockConnection represents a mock database connection for Go 1.18
+pkg/api/handlers.go:312:	// TODO: Implement actual database query when pgx/v5 is available
+pkg/verify/rust_verifier.go:57:	// Return a placeholder ReceiptCore
+pkg/verify/rust_verifier.go:58:	// TODO: Implement actual core extraction from receipt
+pkg/receipt/postgres_store.go:8:// PostgresStoreGo118 is a placeholder for PostgreSQL store that requires Go 1.21+
+pkg/receipt/postgres.go:9:// Store interface for receipt persistence (placeholder for now)
+pkg/deterministicvm/executor.go:491:	// Create a mock receipt for evidence generation
+pkg/deterministicvm/environment.go:227:	// For now, this is a simple placeholder that assumes artifacts
+pkg/deterministicvm/strict_mode_test.go:56:// Note: This test is simplified since checkDeterminismWarnings is not easily mockable
+pkg/deterministicvm/strict_mode_test.go:77:	// In this test, we expect no error since checkDeterminismWarnings is not mocked
+pkg/deterministicvm/strict_mode_test.go:78:	// The real test would require a proper mock or integration test
+pkg/deterministicvm/seccomp_test.go:302:	// In a real test environment, you might want to mock this function
+pkg/deterministicvm/artifacts/disk_cache.go:453:	// For now, return nil as this is a placeholder
+pkg/deterministicvm/artifacts/disk_cache.go:459:	// For now, return nil as this is a placeholder
+pkg/deterministicvm/artifacts/disk_cache.go:477:	// For now, return nil as this is a placeholder
+pkg/deterministicvm/artifacts/disk_cache.go:483:	// For now, return nil as this is a placeholder
+pkg/deterministicvm/artifacts/disk_cache.go:489:	// For now, return nil as this is a placeholder
+pkg/deterministicvm/artifacts/resolver.go:375:	// For now, return nil as this is a placeholder for the actual key loading
+pkg/deterministicvm/artifacts/resolver.go:386:	// For now, return nil as this is a placeholder for the actual signature verification
+pkg/deterministicvm/artifacts/resolver_test.go:86:	// Test with mock remote store
+pkg/deterministicvm/artifacts/resolver_test.go:497:	return "mock-artifact"
+pkg/deterministicvm/artifacts/remote_store.go:79:	// For now, this is a placeholder
+pkg/deterministicvm/artifacts/remote_store.go:319:	// For now, return nil as this is a placeholder
+pkg/performance/integration.go:550:		// For now, it's a placeholder that simulates work
+pkg/performance/metrics.go:232:	// For now, it's a placeholder
+pkg/performance/metrics.go:255:	// For now, it's a placeholder
+pkg/performance/benchmark.go:293:	// Get resource usage (placeholder - would be implemented with actual monitoring)
+pkg/performance/pool.go:66:			// Create a mock connection
+pkg/performance/pool.go:166:// MockConnection represents a mock connection for testing
+pkg/cbor/receipt_v1_1.go:104:	// For now, return JSON marshaled data as placeholder
+pkg/compliance/validator.go:519:	// For now, we'll create a mock report
+pkg/compliance/validator.go:584:	// For now, return a mock result
+pkg/scaling/scaling_test.go:100:	// Create a mock cluster manager
+pkg/scaling/scaling_test.go:160:	// Create a mock cluster manager
+pkg/scaling/scaling_test.go:243:	// Create mock backends
+pkg/scaling/scaling_test.go:335:	// Create a mock cluster manager
+pkg/scaling/scaling_test.go:384:	// Create a mock cluster manager
+pkg/ocx/executor.go:40:	// Create a mock receipt hash
+pkg/ocx/executor.go:44:	// Create a mock receipt blob (simplified CBOR-like structure)
+pkg/ocx/executor.go:45:	receiptBlob := []byte(fmt.Sprintf("mock_receipt_%x_%d", outputHash[:8], cyclesUsed))
+pkg/ocx/api.go:55:	// This is a placeholder that maintains the frozen interface
+pkg/ocx/api.go:63:	// This is a placeholder that maintains the frozen interface
+pkg/ocx/api.go:71:	// This is a placeholder that maintains the frozen interface
+pkg/executor/vm.go:245:	// Sign receipt (placeholder - use real Ed25519 in production)
+pkg/executor/vm.go:287:	// Verify signature (placeholder - use real Ed25519 verification)

@@ -1,0 +1,101 @@
+# OCX Protocol Ship-Lock Makefile
+# Production deployment and release management
+
+.PHONY: build smoke-test conformance-test release clean
+
+# Build all binaries
+build:
+	@echo "🔨 Building OCX Protocol binaries..."
+	go build -o ocx ./cmd/ocx
+	go build -o server ./cmd/server
+	go build -o verify-standalone ./cmd/tools/verify-standalone
+	@echo "✅ Build complete"
+
+# Run comprehensive smoke test
+smoke-test: build
+	@echo "🚀 Running smoke test..."
+	chmod +x scripts/smoke.sh
+	./scripts/smoke.sh
+	@echo "✅ Smoke test passed"
+
+# Run conformance tests
+conformance-test:
+	@echo "🧪 Running conformance tests..."
+	go test -v ./pkg/receipt -run TestReceiptConformance
+	@echo "✅ Conformance tests passed"
+
+# Run all tests
+test:
+	@echo "🧪 Running all tests..."
+	go test -v ./...
+	@echo "✅ All tests passed"
+
+# Create release package
+release: smoke-test conformance-test
+	@echo "📦 Creating release package..."
+	mkdir -p release/ocx-protocol-v0.1.0
+	cp ocx server verify-standalone release/ocx-protocol-v0.1.0/
+	cp -r docs/ release/ocx-protocol-v0.1.0/
+	cp -r ops/ release/ocx-protocol-v0.1.0/
+	cp -r conformance/ release/ocx-protocol-v0.1.0/
+	cp -r k8s/ release/ocx-protocol-v0.1.0/
+	cp Dockerfile Makefile.production README.md VERIFICATION_STATUS.md release/ocx-protocol-v0.1.0/
+	cd release && tar -czf ocx-protocol-v0.1.0.tar.gz ocx-protocol-v0.1.0/
+	@echo "✅ Release package created: release/ocx-protocol-v0.1.0.tar.gz"
+
+# Docker build
+docker-build:
+	@echo "🐳 Building Docker image..."
+	docker build -t ocx-protocol:v0.1.0 .
+	@echo "✅ Docker image built"
+
+# Kubernetes deployment
+k8s-deploy:
+	@echo "☸️ Deploying to Kubernetes..."
+	kubectl apply -f k8s/
+	@echo "✅ Kubernetes deployment complete"
+
+# Clean build artifacts
+clean:
+	@echo "🧹 Cleaning build artifacts..."
+	rm -f ocx server verify-standalone
+	rm -rf out/
+	rm -rf release/
+	@echo "✅ Clean complete"
+
+# Security scan
+security-scan:
+	@echo "🔒 Running security scan..."
+	go list -json -deps ./... | nancy sleuth
+	@echo "✅ Security scan complete"
+
+# Performance benchmark
+benchmark:
+	@echo "⚡ Running performance benchmarks..."
+	go test -bench=. -benchmem ./pkg/deterministicvm/
+	@echo "✅ Benchmarks complete"
+
+# Full CI pipeline
+ci: build test smoke-test conformance-test security-scan benchmark
+	@echo "🎉 CI pipeline complete"
+
+# Production deployment
+deploy-prod: build docker-build k8s-deploy
+	@echo "🚀 Production deployment complete"
+
+# Help
+help:
+	@echo "OCX Protocol Ship-Lock Commands:"
+	@echo "  build          - Build all binaries"
+	@echo "  smoke-test     - Run comprehensive smoke test"
+	@echo "  conformance-test - Run conformance tests"
+	@echo "  test           - Run all tests"
+	@echo "  release        - Create release package"
+	@echo "  docker-build   - Build Docker image"
+	@echo "  k8s-deploy     - Deploy to Kubernetes"
+	@echo "  clean          - Clean build artifacts"
+	@echo "  security-scan  - Run security scan"
+	@echo "  benchmark      - Run performance benchmarks"
+	@echo "  ci             - Run full CI pipeline"
+	@echo "  deploy-prod    - Production deployment"
+	@echo "  help           - Show this help"

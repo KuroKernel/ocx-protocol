@@ -87,42 +87,12 @@ const Specification = () => {
               </div>
             </div>
             
-            <div className="bg-gray-50 p-8 rounded-sm">
-              <h4 className="text-lg font-medium text-black mb-6">Receipt Structure</h4>
-              <div className="space-y-4 text-sm font-mono">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">version:</span>
-                  <span className="text-black">"v1-min"</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">artifact_hash:</span>
-                  <span className="text-black">"2c26b46b68b68f86..."</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">input_hash:</span>
-                  <span className="text-black">"48e80c4b8b405e38..."</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">output_hash:</span>
-                  <span className="text-black">"0ff558246733602c..."</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">cycles:</span>
-                  <span className="text-black">423</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">transcript_root:</span>
-                  <span className="text-black">"7c8199b723e2dab5..."</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">issuer_pubkey:</span>
-                  <span className="text-black">"ed25519:6d4f5dc7..."</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">signature:</span>
-                  <span className="text-black">"ed25519:3a6dd14e..."</span>
-                </div>
-              </div>
+            <div className="w-full h-96 md:h-80 lg:h-96 rounded-lg overflow-hidden shadow-lg flex items-center justify-center">
+              <img 
+                src="/assets/Final_comp.gif" 
+                alt="OCX Protocol Core Concepts Animation" 
+                className="w-full h-full object-cover rounded-lg"
+              />
             </div>
           </div>
         </section>

@@ -10,7 +10,7 @@ import Status from './pages/Status';
 import Support from './pages/Support';
 import TestPage from './pages/TestPage';
 
-const API_BASE = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001';
+const API_BASE = process.env.NODE_ENV === 'production' ? 'https://api.ocx.world' : 'http://localhost:8080';
 
 const OCXLanding = () => {
   const [currentPage, setCurrentPage] = useState('home');

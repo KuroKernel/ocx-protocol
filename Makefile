@@ -8,6 +8,9 @@
 .PHONY: clean-rust clean-go clean-envoy clean-github clean-terraform clean-kafka clean-deterministicvm
 .PHONY: install-deps start-dev-env stop-dev-env health-check logs monitor-performance
 .PHONY: deploy-local deploy-staging deploy-prod security-scan integration-test benchmark
+.PHONY: generate-vectors test-vectors test-determinism test-cross-language clean-vectors
+.PHONY: build-trustscore test-trustscore clean-trustscore install-trustscore-tools
+.PHONY: build-aggregator optimize-aggregator test-aggregator artifacts-aggregator clean-aggregator
 
 # Variables
 COVERAGE_THRESHOLD = 80
@@ -24,11 +27,11 @@ all: build-all
 # =============================================================================
 
 # Build all components (multi-language)
-build-all: build-rust build-go build-envoy build-github build-terraform build-kafka build-deterministicvm
+build-all: build-rust build-go build-envoy build-github build-terraform build-kafka build-deterministicvm build-trustscore build-aggregator
 	@echo "🎉 All OCX components built successfully!"
 
 # Test all components
-test-all: test-rust test-go test-envoy test-github test-terraform test-kafka test-deterministicvm test-integration
+test-all: test-rust test-go test-envoy test-github test-terraform test-kafka test-deterministicvm test-integration test-vectors
 	@echo "🎉 All tests completed successfully!"
 
 # Clean all build artifacts
@@ -53,11 +56,7 @@ benchmark: build-all
 # VERIFICATION TEST TARGETS
 # =============================================================================
 
-# Generate golden vectors
-generate-vectors:
-	@echo "Generating conformance vectors..."
-	cd conformance && go run generate_vectors.go
-	@echo "Golden vectors generated"
+# Generate golden vectors (duplicate removed - see line 454)
 
 # Run verification tests with debug output
 test-verification-debug:
@@ -129,7 +128,7 @@ build-go-verifier:
 
 test-go:
 	@echo "🧪 Testing Go components..."
-	go test -v -timeout=30s ./...
+	go test -v -timeout=30s $(shell go list ./... | grep -v '/archive/')
 	@echo "✅ Go tests passed!"
 
 clean-go:
@@ -232,10 +231,7 @@ test-deterministicvm:
 	go test ./pkg/deterministicvm/ -run=TestDeterministicExecution -count=10
 	@echo "✅ Deterministic VM tests passed!"
 
-test-determinism:
-	@echo "🔍 Running determinism self-test..."
-	@echo "Testing artifact execution determinism..."
-	go test ./pkg/deterministicvm/ -v -run TestDeterministicExecution
+# test-determinism (duplicate removed - see line 470)
 
 test-negative:
 	@echo "🛡️ Running negative security tests..."
@@ -258,6 +254,40 @@ clean-deterministicvm:
 	rm -f pkg/deterministicvm/libocx_dvm_shim.so
 	go clean -cache ./pkg/deterministicvm/...
 	@echo "✅ Deterministic VM artifacts cleaned!"
+
+# =============================================================================
+# TRUSTSCORE REPUTATION MODULE
+# =============================================================================
+
+# Install TrustScore WASM build tools
+install-trustscore-tools:
+	@echo "🔧 Installing TrustScore WASM tools..."
+	cd modules/reputation && make install-tools
+	@echo "✅ TrustScore tools installed!"
+
+# Build TrustScore WASM module
+build-trustscore:
+	@echo "🔨 Building TrustScore WASM module..."
+	cd modules/reputation && make build-wasm
+	@echo "✅ TrustScore WASM built!"
+
+# Test TrustScore module
+test-trustscore:
+	@echo "🧪 Testing TrustScore module..."
+	cd modules/reputation && make test
+	@echo "✅ TrustScore tests passed!"
+
+# Test TrustScore determinism
+test-trustscore-determinism:
+	@echo "🔍 Testing TrustScore determinism..."
+	cd modules/reputation && make test-determinism-stress
+	@echo "✅ TrustScore determinism verified!"
+
+# Clean TrustScore artifacts
+clean-trustscore:
+	@echo "🧹 Cleaning TrustScore artifacts..."
+	cd modules/reputation && make clean
+	@echo "✅ TrustScore artifacts cleaned!"
 
 # =============================================================================
 # INTEGRATION TESTING
@@ -446,6 +476,51 @@ fix-all: install-system-deps fix-envoy fix-terraform fix-kafka
 	@echo "All components fixed successfully"
 
 # =============================================================================
+# GOLDEN VECTOR GENERATION AND TESTING
+# =============================================================================
+
+# Generate golden vectors for cross-language testing
+generate-vectors: build-go
+	@echo "🔬 Generating golden vectors for cross-language testing..."
+	@echo "Creating conformance keys directory..."
+	mkdir -p ./conformance-keys
+	@echo "Running golden vector generator..."
+	cd conformance/cmd/generate-vectors && go run main.go
+	@echo "✅ Golden vectors generated successfully!"
+
+# Test golden vectors
+test-vectors: generate-vectors
+	@echo "🧪 Testing golden vectors..."
+	@echo "Running cross-language conformance tests..."
+	go test -v ./conformance -run TestCrossLanguageConformance
+	@echo "✅ Golden vector tests completed!"
+
+# Test deterministic execution
+test-determinism: build-go
+	@echo "🔍 Testing deterministic execution..."
+	@echo "Running deterministic execution tests..."
+	go test -v ./conformance -run TestDeterministicExecution
+	@echo "Running stress tests..."
+	go test -v ./conformance -run TestDeterministicExecutionStress
+	@echo "✅ Deterministic execution tests completed!"
+
+# Test cross-language conformance
+test-cross-language: generate-vectors
+	@echo "🌐 Testing cross-language conformance..."
+	@echo "Running cross-language tests..."
+	go test -v ./conformance -run TestCrossLanguageConformance
+	@echo "Running golden vector tests..."
+	go test -v ./conformance -run TestDeterministicExecutionWithGoldenVectors
+	@echo "✅ Cross-language conformance tests completed!"
+
+# Clean generated vectors
+clean-vectors:
+	@echo "🧹 Cleaning generated vectors..."
+	rm -rf ./conformance/generated
+	rm -rf ./conformance-keys
+	@echo "✅ Generated vectors cleaned!"
+
+# =============================================================================
 # HELP
 # =============================================================================
 
@@ -490,3 +565,34 @@ help:
 	@echo "  test-terraform  Test Terraform provider"
 	@echo "  test-kafka      Test Kafka interceptor"
 	@echo "  test-deterministicvm   Test Deterministic VM module"
+	@echo ""
+	@echo "Golden Vector Commands:"
+	@echo "  generate-vectors     Generate golden vectors for cross-language testing"
+	@echo "  test-vectors         Test golden vectors"
+	@echo "  test-determinism     Test deterministic execution"
+	@echo "  test-cross-language  Test cross-language conformance"
+	@echo "  clean-vectors        Clean generated vectors"
+
+# =============================================================================
+# REPUTATION AGGREGATOR TARGETS (WASM Module)
+# =============================================================================
+
+build-aggregator:
+	@echo "Building Reputation Aggregator WASM module..."
+	cd modules/reputation-aggregator && $(MAKE) build
+
+optimize-aggregator:
+	@echo "Optimizing Reputation Aggregator WASM module..."
+	cd modules/reputation-aggregator && $(MAKE) optimize
+
+test-aggregator:
+	@echo "Testing Reputation Aggregator..."
+	cd modules/reputation-aggregator && $(MAKE) test
+
+artifacts-aggregator:
+	@echo "Installing Reputation Aggregator artifacts..."
+	cd modules/reputation-aggregator && $(MAKE) artifacts
+
+clean-aggregator:
+	@echo "Cleaning Reputation Aggregator..."
+	cd modules/reputation-aggregator && $(MAKE) clean

@@ -37,7 +37,7 @@ func main() {
 		fmt.Printf("❌ Error: %v\n", err)
 	} else {
 		fmt.Printf("✅ Success! Execution time: %v\n", duration)
-		fmt.Printf("Cycles used: %d\n", result.Receipt.CyclesUsed)
+		fmt.Printf("Cycles used: %d\n", result.Receipt.GasUsed)
 		fmt.Printf("Price: %d micro-units\n", result.Receipt.Price)
 		fmt.Printf("Output size: %d bytes\n", len(result.Output))
 		fmt.Printf("Output: %x\n", result.Output)
@@ -79,7 +79,7 @@ func main() {
 			fmt.Printf("Size %d: ❌ Error: %v\n", size, err)
 		} else {
 			fmt.Printf("Size %d: ✅ Success! Time: %v, Cycles: %d, Price: %d\n", 
-				size, duration, result.Receipt.CyclesUsed, result.Receipt.Price)
+				size, duration, result.Receipt.GasUsed, result.Receipt.Price)
 		}
 	}
 	

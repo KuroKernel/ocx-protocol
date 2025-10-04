@@ -1,40 +1,54 @@
-# Multi-stage build for minimal production image
-FROM golang:1.21-alpine AS builder
+# Multi-stage build for OCX Protocol
+FROM golang:1.24-alpine AS builder
 
 # Install build dependencies
-RUN apk add --no-cache git ca-certificates tzdata
+RUN apk add --no-cache git make
 
 # Set working directory
-WORKDIR /build
+WORKDIR /app
 
 # Copy go mod files
 COPY go.mod go.sum ./
-
-# Download dependencies
 RUN go mod download
 
 # Copy source code
 COPY . .
 
-# Build optimized binaries
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -extldflags=-static" -trimpath -o ocx-server ./cmd/minimal-server
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -extldflags=-static" -trimpath -o ocx-cli ./cmd/minimal-cli
+# Build the application
+RUN make build
 
-# Production stage
-FROM scratch
+# Runtime stage
+FROM alpine:latest
 
-# Copy CA certificates for HTTPS
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata
 
-# Copy timezone data
-COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+# Create non-root user
+RUN adduser -D -s /bin/sh ocx
 
-# Copy binaries
-COPY --from=builder /build/ocx-server /ocx-server
-COPY --from=builder /build/ocx-cli /ocx-cli
+# Set working directory
+WORKDIR /app
+
+# Copy binaries from builder
+COPY --from=builder /app/ocx /app/ocx
+COPY --from=builder /app/server /app/server
+COPY --from=builder /app/verify-standalone /app/verify-standalone
+
+# Copy database schema
+COPY --from=builder /app/database/migrations /app/database/migrations
+
+# Set ownership
+RUN chown -R ocx:ocx /app
+
+# Switch to non-root user
+USER ocx
 
 # Expose port
 EXPOSE 8080
 
-# Run server
-ENTRYPOINT ["/ocx-server"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/livez || exit 1
+
+# Default command
+CMD ["./server"]

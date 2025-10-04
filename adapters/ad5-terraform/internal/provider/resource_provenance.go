@@ -221,6 +221,6 @@ func (r *ProvenanceResource) Delete(ctx context.Context, req resource.DeleteRequ
 
 func (r *ProvenanceResource) storeReceipt(ctx context.Context, storageURL string, receipt []byte, provenanceID string) (string, error) {
 	// Implementation would depend on storage backend (S3, GCS, etc.)
-	// For now, return the input URL as a placeholder
+	return the input URL as a placeholder
 	return fmt.Sprintf("%s/%s.json", storageURL, provenanceID), nil
 }

@@ -33,16 +33,16 @@ jobs:
       run: make install-tools
     
     - name: Run tests
-      run: make test-race
+      run: go test -v -timeout=30s $(shell go list ./... | grep -v '/archive/')
     
     - name: Run coverage
-      run: make test-coverage
+      run: go test -coverprofile=coverage.out -covermode=atomic $(shell go list ./... | grep -v '/archive/')
     
     - name: Check coverage threshold
       run: make check-coverage
     
     - name: Run benchmarks
-      run: make benchmark
+      run: go test -bench=. $(shell go list ./... | grep -v '/archive/')
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3

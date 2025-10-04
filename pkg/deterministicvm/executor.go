@@ -4,8 +4,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"runtime"
+	"strings"
+	"time"
 )
 
 // ExecuteArtifact is the main entry point for deterministic artifact execution.
@@ -105,40 +111,40 @@ func ExecuteArtifactWithConfig(ctx context.Context, artifactHash [32]byte, input
 // createDeterministicConfig builds a VMConfig with all deterministic settings.
 func createDeterministicConfig(execDir string, input []byte) VMConfig {
 	config := DefaultVMConfig()
-	
+
 	// Set execution-specific paths
 	config.ArtifactPath = filepath.Join(execDir, "artifact")
 	config.WorkingDir = execDir
 	config.InputData = input
-	
+
 	// Enhance environment variables for maximum determinism
 	config.Env = append(config.Env,
 		// Disable hardware-specific optimizations that could affect determinism
-		"OMP_NUM_THREADS=1",           // Force single-threaded OpenMP
-		"OPENBLAS_NUM_THREADS=1",      // Force single-threaded OpenBLAS
-		"MKL_NUM_THREADS=1",           // Force single-threaded Intel MKL
-		"NUMEXPR_NUM_THREADS=1",       // Force single-threaded NumExpr
-		
+		"OMP_NUM_THREADS=1",      // Force single-threaded OpenMP
+		"OPENBLAS_NUM_THREADS=1", // Force single-threaded OpenBLAS
+		"MKL_NUM_THREADS=1",      // Force single-threaded Intel MKL
+		"NUMEXPR_NUM_THREADS=1",  // Force single-threaded NumExpr
+
 		// Disable randomization features
-		"PYTHONHASHSEED=0",            // Python hash seed
-		"MALLOC_PERTURB_=0",           // Disable glibc malloc perturbation
-		
+		"PYTHONHASHSEED=0",  // Python hash seed
+		"MALLOC_PERTURB_=0", // Disable glibc malloc perturbation
+
 		// Set predictable temporary directories
 		"TMPDIR="+filepath.Join(execDir, "tmp"),
 		"TEMP="+filepath.Join(execDir, "tmp"),
 		"TMP="+filepath.Join(execDir, "tmp"),
-		
+
 		// Disable profiling and debugging that could affect timing
 		"CPUPROFILE=",
 		"MEMPROFILE=",
-		"GOMAXPROCS=1",                // Force single-threaded Go
-		
+		"GOMAXPROCS=1", // Force single-threaded Go
+
 		// Set predictable cache directories
 		"XDG_CACHE_HOME="+filepath.Join(execDir, "tmp", "cache"),
 		"XDG_DATA_HOME="+filepath.Join(execDir, "tmp", "data"),
 		"XDG_CONFIG_HOME="+filepath.Join(execDir, "tmp", "config"),
 	)
-	
+
 	return config
 }
 
@@ -146,17 +152,31 @@ func createDeterministicConfig(execDir string, input []byte) VMConfig {
 func validateExecutionResult(result *ExecutionResult, config VMConfig) error {
 	// Check for successful execution (unless we expect failures)
 	if result.ExitCode != 0 {
-		// For now, we'll allow non-zero exit codes but log them
-		// In production, you might want to be more strict
+		// Log non-zero exit codes for debugging
+		log.Printf("Warning: Process exited with code %d", result.ExitCode)
+
+		// In strict mode, treat non-zero exit codes as failures
+		if config.StrictMode {
+			return &ExecutionError{
+				Code:    ErrorCodeExecutionFailed,
+				Message: fmt.Sprintf("Process failed with exit code %d (strict mode enabled)", result.ExitCode),
+				Context: map[string]interface{}{
+					"exit_code":   result.ExitCode,
+					"stdout":      result.Stdout,
+					"stderr":      result.Stderr,
+					"strict_mode": true,
+				},
+			}
+		}
 	}
 
-	// Validate cycle usage
-	if result.CyclesUsed > config.CycleLimit {
+	// Validate cycle usage (using host cycles for limit checking)
+	if result.HostCycles > config.CycleLimit {
 		return &ExecutionError{
 			Code:    ErrorCodeCycleLimitExceeded,
-			Message: fmt.Sprintf("Execution exceeded cycle limit: %d > %d", result.CyclesUsed, config.CycleLimit),
+			Message: fmt.Sprintf("Execution exceeded cycle limit: %d > %d", result.HostCycles, config.CycleLimit),
 			Context: map[string]interface{}{
-				"cycles_used": result.CyclesUsed,
+				"cycles_used": result.HostCycles,
 				"cycle_limit": config.CycleLimit,
 			},
 		}
@@ -188,9 +208,22 @@ func validateExecutionResult(result *ExecutionResult, config VMConfig) error {
 
 	// Check for suspicious patterns that could indicate non-determinism
 	if err := checkDeterminismWarnings(result); err != nil {
-		// For now, just log warnings rather than failing
-		// In production, you might want to collect these for analysis
-		fmt.Printf("Determinism warning: %v\n", err)
+		// Log determinism warnings for analysis
+		log.Printf("Determinism warning: %v", err)
+
+		// In strict mode, treat determinism warnings as failures
+		if config.StrictMode {
+			return &ExecutionError{
+				Code:    ErrorCodeNonDeterministic,
+				Message: fmt.Sprintf("Non-deterministic execution detected (strict mode enabled): %v", err),
+				Context: map[string]interface{}{
+					"warning":     err.Error(),
+					"stdout":      result.Stdout,
+					"stderr":      result.Stderr,
+					"strict_mode": true,
+				},
+			}
+		}
 	}
 
 	return nil
@@ -198,13 +231,34 @@ func validateExecutionResult(result *ExecutionResult, config VMConfig) error {
 
 // enrichExecutionResult adds additional metadata to the execution result.
 func enrichExecutionResult(result *ExecutionResult, artifactHash [32]byte, input []byte) *ExecutionResult {
-	// The result is already mostly complete, but we could add:
-	// - Input hash for verification
-	// - Artifact hash for traceability
-	// - Additional determinism metadata
-	
-	// For now, we'll return the result as-is since the caller
-	// has access to the artifactHash and input for receipt generation
+	// Calculate deterministic gas for the execution
+	// This replaces the variable GasUsed with deterministic GasUsed
+
+	// Get the artifact content to calculate deterministic gas
+	artifactPath, err := resolveArtifactFromHash(artifactHash)
+	if err != nil {
+		// Fallback to a reasonable default if we can't read the artifact
+		result.GasUsed = 1000
+		return result
+	}
+
+	// Read artifact content
+	artifactContent, err := os.ReadFile(artifactPath)
+	if err != nil {
+		// Fallback to a reasonable default
+		result.GasUsed = 1000
+		return result
+	}
+
+	// Calculate deterministic gas based on artifact content and input
+	result.GasUsed = CalculateDeterministicGas(string(artifactContent), input)
+
+	// Keep the original cycles as HostCycles for diagnostics
+	// (HostCycles is already set by the VM execution)
+
+	// Add host information
+	result.HostInfo = getHostInfo()
+
 	return result
 }
 
@@ -212,35 +266,35 @@ func enrichExecutionResult(result *ExecutionResult, artifactHash [32]byte, input
 func checkDeterminismWarnings(result *ExecutionResult) error {
 	// Check for common non-deterministic patterns in output
 	warnings := []string{}
-	
+
 	// Convert output to string for pattern matching
 	stdout := string(result.Stdout)
 	stderr := string(result.Stderr)
-	
+
 	// Check for timestamp patterns (basic heuristic)
 	timestampPatterns := []string{
 		"2024-", "2025-", // Year patterns
-		" UTC", " GMT",   // Timezone indicators
+		" UTC", " GMT", // Timezone indicators
 		"T00:", "T01:", "T02:", "T03:", "T04:", "T05:", // Hour patterns
 		"timestamp", "time", "date", // Common time-related words
 	}
-	
+
 	for _, pattern := range timestampPatterns {
 		if containsIgnoreCase(stdout, pattern) || containsIgnoreCase(stderr, pattern) {
 			warnings = append(warnings, fmt.Sprintf("Potential timestamp in output: %s", pattern))
 		}
 	}
-	
+
 	// Check for memory addresses (which should be ASLR-disabled but worth checking)
 	if containsPattern(stdout, `0x[a-fA-F0-9]{8,}`) || containsPattern(stderr, `0x[a-fA-F0-9]{8,}`) {
 		warnings = append(warnings, "Potential memory address in output")
 	}
-	
+
 	// Check for process IDs
 	if containsPattern(stdout, `pid[:\s]+\d+`) || containsPattern(stderr, `pid[:\s]+\d+`) {
 		warnings = append(warnings, "Potential process ID in output")
 	}
-	
+
 	if len(warnings) > 0 {
 		return &ExecutionError{
 			Code:    ErrorCodeUnknown, // This is just a warning
@@ -250,21 +304,25 @@ func checkDeterminismWarnings(result *ExecutionResult) error {
 			},
 		}
 	}
-	
+
 	return nil
 }
 
 // Helper functions
 
 func containsIgnoreCase(s, substr string) bool {
-	return len(s) >= len(substr) && 
-		   containsPattern(s, `(?i)`+substr)
+	return len(s) >= len(substr) &&
+		containsPattern(s, `(?i)`+substr)
 }
 
 func containsPattern(s, pattern string) bool {
-	// Simple pattern matching - in production you'd use regexp
-	// For now, just check for simple substring matches
-	return len(s) > 0 && len(pattern) > 0
+	// Use regexp for proper pattern matching
+	matched, err := regexp.MatchString(pattern, s)
+	if err != nil {
+		// If regex fails, fall back to simple substring matching
+		return strings.Contains(strings.ToLower(s), strings.ToLower(pattern))
+	}
+	return matched
 }
 
 // GetArtifactInfo retrieves metadata about an artifact without executing it.
@@ -273,16 +331,16 @@ func GetArtifactInfo(artifactHash [32]byte) (*ArtifactInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	info, err := os.Stat(artifactPath)
 	if err != nil {
 		return nil, &ExecutionError{
-			Code:    ErrorCodeArtifactInvalid,
-			Message: "Failed to stat artifact",
+			Code:       ErrorCodeArtifactInvalid,
+			Message:    "Failed to stat artifact",
 			Underlying: err,
 		}
 	}
-	
+
 	return &ArtifactInfo{
 		Hash:       artifactHash,
 		Path:       artifactPath,
@@ -294,8 +352,8 @@ func GetArtifactInfo(artifactHash [32]byte) (*ArtifactInfo, error) {
 
 // detectArtifactFormat attempts to identify the artifact type.
 func detectArtifactFormat(path string) string {
-	// Simple format detection based on file extension and magic numbers
-	// In production, you'd want more sophisticated detection
+	// Format detection based on file extension and magic numbers
+	// Supports: WASM, JavaScript, Python, ELF binaries, and shell scripts
 	ext := filepath.Ext(path)
 	switch ext {
 	case ".wasm":
@@ -304,10 +362,32 @@ func detectArtifactFormat(path string) string {
 		return "javascript"
 	case ".py":
 		return "python"
+	case ".sh":
+		return "shell"
+	case ".bash":
+		return "bash"
+	case ".zsh":
+		return "zsh"
+	case ".fish":
+		return "fish"
+	case ".exe":
+		return "windows_executable"
+	case ".dll":
+		return "windows_library"
+	case ".so":
+		return "shared_object"
+	case ".dylib":
+		return "macos_library"
 	default:
-		// Try to detect ELF binaries by reading magic bytes
+		// Try to detect binary formats by reading magic bytes
 		if isELFBinary(path) {
 			return "elf"
+		}
+		if isWASMBinaryFile(path) {
+			return "wasm"
+		}
+		if isShellScript(path) {
+			return "shell"
 		}
 		return "unknown"
 	}
@@ -320,33 +400,115 @@ func isELFBinary(path string) bool {
 		return false
 	}
 	defer file.Close()
-	
+
 	magic := make([]byte, 4)
 	if _, err := file.Read(magic); err != nil {
 		return false
 	}
-	
+
 	return magic[0] == 0x7f && magic[1] == 'E' && magic[2] == 'L' && magic[3] == 'F'
+}
+
+// isWASMBinaryFile checks if the file is a WebAssembly binary
+func isWASMBinaryFile(path string) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+
+	magic := make([]byte, 4)
+	if _, err := file.Read(magic); err != nil {
+		return false
+	}
+
+	// WASM magic number: 0x00 0x61 0x73 0x6d (".wasm")
+	return magic[0] == 0x00 && magic[1] == 0x61 && magic[2] == 0x73 && magic[3] == 0x6d
+}
+
+// isShellScript checks if the file is a shell script by reading the shebang
+func isShellScript(path string) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+
+	// Read first line to check for shebang
+	buffer := make([]byte, 1024)
+	n, err := file.Read(buffer)
+	if err != nil || n < 2 {
+		return false
+	}
+
+	firstLine := string(buffer[:n])
+	// Check for common shell shebangs
+	shellShebangs := []string{
+		"#!/bin/sh",
+		"#!/bin/bash",
+		"#!/bin/zsh",
+		"#!/bin/fish",
+		"#!/usr/bin/env sh",
+		"#!/usr/bin/env bash",
+		"#!/usr/bin/env zsh",
+		"#!/usr/bin/env fish",
+	}
+
+	for _, shebang := range shellShebangs {
+		if strings.HasPrefix(firstLine, shebang) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// getHostInfo collects variable host system information for diagnostics
+func getHostInfo() HostInfo {
+	info := HostInfo{
+		Platform: runtime.GOOS + "/" + runtime.GOARCH,
+	}
+
+	// Try to get CPU model
+	if cpuInfo, err := exec.Command("uname", "-m").Output(); err == nil {
+		info.CPUModel = strings.TrimSpace(string(cpuInfo))
+	}
+
+	// Try to get kernel version
+	if kernelInfo, err := exec.Command("uname", "-r").Output(); err == nil {
+		info.KernelVer = strings.TrimSpace(string(kernelInfo))
+	}
+
+	// Try to get load average
+	if loadInfo, err := exec.Command("uptime").Output(); err == nil {
+		info.LoadAvg = strings.TrimSpace(string(loadInfo))
+	}
+
+	return info
 }
 
 // generateExecutionEvidence creates evidence for the execution
 func generateExecutionEvidence(artifactHash [32]byte, input []byte, result *ExecutionResult, config *VMConfig) {
-	// Create a mock receipt for evidence generation
+	// Create execution receipt for evidence generation
 	receipt := &OCXReceipt{
 		SpecHash:     [32]byte{}, // Would be set by caller
 		ArtifactHash: artifactHash,
 		InputHash:    sha256.Sum256(input),
 		OutputHash:   sha256.Sum256(result.Stdout),
-		CyclesUsed:   result.CyclesUsed,
+		GasUsed:      result.GasUsed,
+		HostCycles:   result.HostCycles,
 		StartedAt:    uint64(result.StartTime.Unix()),
 		FinishedAt:   uint64(result.EndTime.Unix()),
+		DurationMs:   uint64(result.Duration.Milliseconds()),
+		MemoryUsed:   result.MemoryUsed,
+		HostInfo:     result.HostInfo,
 		IssuerID:     "ocx-dmvm-v1",
 		Signature:    []byte{}, // Would be signed by caller
 	}
-	
+
 	// Generate receipt hash
 	receiptHash := fmt.Sprintf("sha256:%x", sha256.Sum256(receipt.toCanonicalCBOR()))
-	
+
 	// Create evidence
 	evidence := CreateEvidence(
 		fmt.Sprintf("artifact_%x", artifactHash),
@@ -354,7 +516,98 @@ func generateExecutionEvidence(artifactHash [32]byte, input []byte, result *Exec
 		fmt.Sprintf("0x%08x", config.Seed),
 		*config,
 	)
-	
+
 	// Emit evidence
 	emitEvidence(evidence)
+}
+
+// ExecutorConfig holds executor configuration
+type ExecutorConfig struct {
+	WorkingDir    string
+	EnableSeccomp bool
+	StrictMode    bool
+	Timeout       int
+	Environment   []string
+}
+
+// Executor executes artifacts deterministically
+type Executor struct {
+	config ExecutorConfig
+}
+
+// NewExecutor creates a new executor
+func NewExecutor(config ExecutorConfig) (*Executor, error) {
+	if config.WorkingDir == "" {
+		config.WorkingDir = "/tmp"
+	}
+
+	return &Executor{
+		config: config,
+	}, nil
+}
+
+// Execute runs an artifact and returns results
+func (e *Executor) Execute(ctx context.Context, artifactPath string) (*ExecutionResult, error) {
+	startTime := time.Now()
+
+	// Apply seccomp if enabled
+	if e.config.EnableSeccomp {
+		seccompCfg := SeccompConfig{
+			StrictSandbox: e.config.StrictMode,
+			WorkingDir:    e.config.WorkingDir,
+		}
+
+		if err := ApplySeccompProfile(ctx, seccompCfg); err != nil {
+			if e.config.StrictMode {
+				return nil, fmt.Errorf("seccomp required but unavailable: %w", err)
+			}
+			// Continue without seccomp in non-strict mode
+		}
+	}
+
+	// Execute artifact
+	cmd := exec.CommandContext(ctx, artifactPath)
+	cmd.Dir = e.config.WorkingDir
+	cmd.Env = e.config.Environment
+
+	stdout, err := cmd.Output()
+	stderr := []byte{}
+	exitCode := 0
+
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+			stderr = exitErr.Stderr
+		} else {
+			return nil, fmt.Errorf("execution failed: %w", err)
+		}
+	}
+
+	endTime := time.Now()
+	duration := endTime.Sub(startTime)
+
+	result := &ExecutionResult{
+		ExitCode:   exitCode,
+		Stdout:     stdout,
+		Stderr:     stderr,
+		Duration:   duration,
+		GasUsed:    uint64(calculateGasUsed(duration, len(stdout), len(stderr))),
+		MemoryUsed: uint64(len(stdout) + len(stderr)),
+		StartTime:  startTime,
+		EndTime:    endTime,
+		HostInfo: HostInfo{
+			Platform: runtime.GOOS + "/" + runtime.GOARCH,
+		},
+	}
+
+	return result, nil
+}
+
+// calculateGasUsed computes gas consumption
+func calculateGasUsed(duration time.Duration, stdoutLen, stderrLen int) int64 {
+	// Simplified gas calculation
+	// 1 gas per millisecond + 1 gas per KB of output
+	timeGas := duration.Milliseconds()
+	outputGas := int64((stdoutLen + stderrLen) / 1024)
+	return timeGas + outputGas
 }

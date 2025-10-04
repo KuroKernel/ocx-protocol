@@ -1,7 +1,7 @@
 // types.go — OCX Protocol v0.1 (foundational schemas)
 // go 1.22+
 
-package main
+package ocx
 
 import "time"
 

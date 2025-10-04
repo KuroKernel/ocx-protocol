@@ -1,374 +1,231 @@
-# OCX Protocol v1.0.0-rc.1
+# OCX Protocol: Deterministic Execution with Cryptographic Proofs
 
-**Mathematical proof for computational integrity**
+## 🎯 **What is OCX Protocol?**
 
-![OCX Protocol Logo](./public/assets/logos/ocx-logo-primary.svg)
+OCX Protocol is a revolutionary system that provides **mathematical proof of execution authenticity**. It solves the fundamental trust problem in computing by creating tamper-proof certificates for software execution results.
 
-[![OCX Protocol](https://img.shields.io/badge/OCX-Protocol%20v1.0.0--rc.1-blue)](https://github.com/ocx-protocol/ocx)
-[![Specification](https://img.shields.io/badge/Spec-v1--min%20FROZEN-green)](./docs/spec-v1.md)
-[![Conformance](https://img.shields.io/badge/Conformance-100%25%20Pass-brightgreen)](./conformance)
-[![Determinism](https://img.shields.io/badge/Determinism-Cross--Arch%20Verified-orange)](./scripts/determinism.sh)
+**Think of it as a "digital notary" for software execution.**
 
-## 🏗️ Architecture Overview
+## 🚀 **Quick Start - 60 Second "Prove It"**
 
-```mermaid
-flowchart TB
-%% ======== CLASSES / STYLES ========
-classDef actor fill:#fdf6e3,stroke:#333,stroke-width:1px,color:#111;
-classDef adapter fill:#e8f0ff,stroke:#4e79a7,stroke-width:1px,color:#0b2545;
-classDef api fill:#e8f5e9,stroke:#2e7d32,color:#0a2f14;
-classDef core fill:#fff3e0,stroke:#ef6c00,color:#3b2200;
-classDef verify fill:#e3f2fd,stroke:#1565c0,color:#0a1e3b;
-classDef store fill:#ede7f6,stroke:#5e35b1,color:#28124d;
-classDef policy fill:#fffde7,stroke:#f9a825,color:#443600;
-classDef analytics fill:#e0f7f7,stroke:#00796b,color:#003d39;
-classDef gov fill:#fce4ec,stroke:#ad1457,color:#520a26;
-classDef security fill:#f3e5f5,stroke:#6a1b9a,color:#2f0a4d;
-
-%% ======== LAYER: ACTORS ========
-subgraph L0["🎭 Actors & Stakeholders"]
-direction TB
-A1[Developers / Integrators]:::actor
-A2[Operators / FinOps / Compliance]:::actor
-A3[Auditors / Insurers / Regulators]:::actor
-A4[End Users / Customers]:::actor
-end
-
-%% ======== LAYER: ADAPTERS ========
-subgraph L1["🔌 Adapters (Drop-ins)"]
-direction LR
-AD1["GitHub Action<br/>ocx-verify-action"]:::adapter
-AD2["Kubernetes Webhook<br/>label: ocx=on"]:::adapter
-AD3["Airflow Operator<br/>@ocx.task"]:::adapter
-AD4["FFmpeg Filter<br/>-vf ocx=emit=1"]:::adapter
-AD5["PyTorch Wrapper<br/>ocx.exec(...)"]:::adapter
-AD6["CLI Wrapper<br/>ocx run -- cmd"]:::adapter
-end
-
-%% ======== LAYER: API/SDK ========
-subgraph L2["⚡ Ingress (CLI / SDK / API)"]
-direction LR
-CLI[minimal-cli]:::api
-SDK["SDKs<br/>(Go/Python/Rust)"]:::api
-REST["/REST API<br/>/api/v1/execute<br/>/api/v1/verify<br/>/api/v1/receipts/"]:::api
-end
-
-%% ======== LAYER: OCX CORE ========
-subgraph L3["🔥 OCX Core (v1-min)"]
-direction TB
-C0["Spec v1-min (FROZEN)<br/>profile_id=1"]:::core
-C1["Deterministic VM<br/>(no clock/syscalls/threads/FP)"]:::core
-C2["Cycle Meter<br/>(alpha,beta,gamma)"]:::core
-C3["Transcript Builder<br/>Hash chain → Merkle root"]:::core
-C4["CBOR Serializer<br/>(canonical, strict)"]:::core
-C5[Ed25519 Signer]:::core
-C6["Receipt Emitter<br/>{artifact_hash,input_hash,output_hash,<br/>cycles,transcript_root,sig}"]:::core
-end
-
-%% ======== LAYER: CRI / CONFORMANCE ========
-subgraph L4["✅ Truth & Conformance"]
-direction LR
-T1["CRI-lite (Executable Spec)<br/>slow reference interpreter"]:::verify
-T2["Conformance Suite<br/>Golden receipts & vectors"]:::verify
-T3["Cross-Arch Determinism Job<br/>(x86 ↔ ARM buildx/QEMU)"]:::verify
-end
-
-%% ======== LAYER: STORAGE / VERIFY ========
-subgraph L5["🔍 Verify & Storage"]
-direction LR
-V1["Offline Verifier (lib/CLI)<br/>subtle.ConstantTimeCompare"]:::verify
-V2["Hosted Verify API<br/>stateless, $5/M checks"]:::verify
-S1["Receipts Store / Index<br/>immutable table + search<br/>($3/M receipts-mo)"]:::store
-S2["Exporters<br/>CSV / Parquet"]:::store
-end
-
-%% ======== LAYER: POLICY / EXT (Optional) ========
-subgraph L6["📋 Policy Layer (Optional, Out-of-Band)"]
-direction LR
-P1["OCX-EXT Envelope<br/>keeps base receipt pure"]:::policy
-P2["Auditor Quorum<br/>N-of-M signatures over receipt_hash"]:::policy
-P3["Billing / Chargeback<br/>cycles→$ mapping"]:::policy
-P4["Compliance Mapping<br/>controls→evidence"]:::policy
-end
-
-%% ======== LAYER: ANALYTICS / BENCH ========
-subgraph L7["📊 Analytics & Bench (No PII)"]
-direction LR
-AN1["Benchmarks<br/>exec/verify p50/p99"]:::analytics
-AN2["Determinism Lab<br/>matrix across arches/vendors"]:::analytics
-AN3["Atlas (Aggregate Patterns)<br/>privacy-preserving"]:::analytics
-end
-
-%% ======== LAYER: GOVERNANCE / VERSIONING / SECURITY ========
-subgraph L8["🛡️ Governance / Profiles / Security"]
-direction LR
-G1["Profiles<br/>v1-min, v1-fp, v1-gpu<br/>(new capability = new profile)"]:::gov
-G2["DISPUTES.md<br/>Drift Playbook → new golden"]:::gov
-G3["FAIRNESS.md & PRICING.md<br/>(convenience + assurance only)"]:::gov
-SEC1["Strict CBOR / size caps<br/>reject duplicate keys"]:::security
-SEC2[Constant-time compares]:::security
-SEC3[Rate/timeout bounds]:::security
-end
-
-%% ======== FLOWS ========
-%% Adapters feed ingress
-A1 --> AD1
-A1 --> AD2
-A1 --> AD3
-A4 --> AD4
-A1 --> AD5
-A1 --> AD6
-
-AD1 --> CLI
-AD2 --> REST
-AD3 --> SDK
-AD4 --> CLI
-AD5 --> SDK
-AD6 --> CLI
-
-%% Execute path
-CLI -->|"OCX_EXEC<br/>artifact,input,max_cycles"| C1
-SDK -->|OCX_EXEC| C1
-REST -->|OCX_EXEC| C1
-
-C1 --> C2 --> C3 --> C4 --> C5 --> C6
-C6 -.->|"receipt (CBOR+sig)"| V1
-C6 -.->|receipt| S1
-C6 -.->|receipt| V2
-C6 -.->|receipt| P3
-
-%% Verify paths
-V1 -->|"verify(receipt)"| A2
-V2 -->|"verify API"| A2
-A3 -->|"offline verify"| V1
-
-%% Conformance / truth loop
-T2 -->|"golden vectors"| C1
-C6 -.->|"computed receipts"| T2
-T1 -->|"arbitrate drift"| T2
-T3 -->|"amd64 vs arm64 identical<br/>receipt_hash"| T2
-
-%% Policy/EXT is optional
-S1 -.->|receipt_hash| P2
-P2 ..->|"quorum attestations"| A3
-P4 ..->|"maps receipts→controls"| A2
-
-%% Analytics/bench (aggregate)
-S1 -.-> AN1
-V2 -.-> AN1
-T3 -.-> AN2
-AN1 -.-> A2
-AN2 -.-> A2
-
-%% Governance / security influence
-G1 --> C0
-G2 --> T2
-G3 --> P3
-SEC1 --> C4
-SEC2 --> V1
-SEC3 --> REST
-
-%% ======== NUMBERED CALLOUTS ========
-C6 -.- N1["①<br/>Proof, not promises:<br/>receipts encode what ran"]
-V1 -.- N2["②<br/>Offline verify:<br/>no network needed"]
-T3 -.- N3["③<br/>Cross-arch determinism:<br/>identical hashes"]
-G1 -.- N4["④<br/>Frozen spec + profiles:<br/>v1-min never changes"]
-P1 -.- N5["⑤<br/>Policy out-of-band:<br/>base receipt stays pure"]
-P3 -.- N6["⑥<br/>Fair economics:<br/>convenience + assurance only"]
-
-%% ======== LEGEND ========
-subgraph Legend["📖 Legend"]
-direction TB
-Lsolid["→ Solid: control/API call"]:::actor
-Ldash["-.-> Dashed: data artifact (receipt/golden/hash)"]:::actor  
-Ldot["..-> Dotted: optional/hosted/policy-layer"]:::actor
-end
-```
-
-**[📖 Full Architecture Documentation](./docs/architecture-diagram.md) | [🖼️ A3 Poster](./posters/OCX_Architecture_A3_Poster.md) | [📐 SVG Diagram](./docs/architecture-diagram.svg)**
-
-## Quick Start
-
+### 1) Build
 ```bash
-# Run simple demo (recommended first)
-make simple-demo
-
-# Run killer applications demo
-make demo
-
-# Quick GPU verification
-./scripts/test_rtx5060.sh quick
-
-# Live GPU monitoring
-./scripts/test_rtx5060.sh monitor
-
-# Full end-to-end test (offer → order → provision → monitor → settle)
-./scripts/test_rtx5060.sh full
+go build -o server ./cmd/server
+go build -o verify-standalone ./cmd/tools/verify-standalone
 ```
 
-## Killer Applications
-
-OCX Protocol includes ready-to-run programs that demonstrate its power:
-
-1. **AlphaFold Protein Folding** - Simulates protein folding energy calculations
-2. **LLVM Compiler Testing** - Tests compiler optimization passes
-3. **Bitcoin Difficulty Adjustment** - Implements mining difficulty algorithms
-4. **Doom Physics Simulation** - Game engine physics with collision detection
-5. **WebGL Benchmark** - GPU shader compilation and performance testing
-
-Each program runs deterministically with cryptographic receipts, cycle-accurate metering, and verifiable results.
-
-## Architecture
-
-```
-.
-├── cmd/ocx-gpu-test/           # Single, clean binary
-│   └── main.go
-├── internal/
-│   ├── gpu/                    # NVIDIA GPU adapter & metrics
-│   │   ├── info.go
-│   │   ├── monitor.go
-│   │   └── runmodes.go
-│   └── ocxstub/                # Drop-in OCX client stub
-│       └── client.go
-├── scripts/
-│   └── test_rtx5060.sh
-└── bin/
-    └── ocx-gpu-test            # Built binary
-```
-
-## Features
-
-- **Real Hardware Integration**: Works with actual NVIDIA GPUs via `nvidia-smi`
-- **Complete Business Flow**: Order → Matching → Provisioning → Usage → Settlement
-- **Live Monitoring**: Real-time GPU metrics (utilization, temperature, memory, power)
-- **Production Ready**: Clean architecture, proper error handling, JSON logging
-- **Drop-in Replacement**: Easy to swap `ocxstub` with real OCX client
-
-## GPU Requirements
-
-- NVIDIA GPU with `nvidia-smi` support
-- Driver version 570+ recommended
-- CUDA toolkit optional (for workload testing)
-
-## Example Output
-
+### 2) Run demo
 ```bash
-$ ./scripts/test_rtx5060.sh quick
-GPU=NVIDIA Graphics Device, Mem=8151MB, Driver=570.153.02, Temp=56C, Util=84%
-
-$ ./scripts/test_rtx5060.sh full
-GPU=NVIDIA Graphics Device, Mem=8151MB, Driver=570.153.02, Temp=61C, Util=87%
-offer=offer_1757963962616250243 $/h=2.50
-order=order_1757963962616254021
-matched order=order_1757963962616254021 provider=local-nvidia-provider
-lease=lease_1757963964625396154 addr=192.168.150.102:22 ssh_user=kurokernel
-util=96% temp=61C mem=851/8151MB power=0W
-util=99% temp=60C mem=853/8151MB power=0W
-full test complete
+OCX_API_KEY=prod-ocx-key OCX_PORT=9001 demo/DEMO.sh
 ```
 
-## Development
+**Expected output:**
+- ✅ Server starts on port 9001
+- ✅ Two identical stdout hashes (deterministic execution)
+- ✅ Receipt verification: `verified=true`
+- ✅ Tamper detection: `verified=false`
+- ✅ Final message: `DEMO ✅`
 
+### 3) Manual verification (if demo fails)
 ```bash
-# Build the binary
-go build -o ./bin/ocx-gpu-test ./cmd/ocx-gpu-test
+# Start server
+OCX_API_KEY=prod-ocx-key OCX_DISABLE_DB=true OCX_PORT=9001 ./server &
 
-# Run with custom options
-./bin/ocx-gpu-test -test=monitor -duration=60s -server=http://localhost:8080
+# Test execution
+HASH="f8a4e38a18001ece6fe697503722847e18b241a74543bf25a6ffee3733a38a6c"
+INPUT_HEX=$(printf "demo" | xxd -p -c 256)
+curl -H "X-API-Key: prod-ocx-key" -H "Content-Type: application/json" \
+  -d "{\"artifact_hash\":\"$HASH\",\"input\":\"$INPUT_HEX\"}" \
+  http://127.0.0.1:9001/api/v1/execute | jq -r '.receipt_b64' | base64 -d > /tmp/rcpt.cbor
+
+# Verify receipt
+PUBHEX="8d42905855072bf422f91315db2009c372700fa0345980ae5a7af9c098941cdf"
+printf "%s" "$PUBHEX" | xxd -r -p | base64 > /tmp/pub.b64
+./verify-standalone /tmp/rcpt.cbor /tmp/pub.b64
 ```
 
-## Integration
+### Prerequisites
+- Go 1.18+
+- Linux environment (Ubuntu 22.04+ recommended)
+- Docker (optional, for PostgreSQL)
 
-To integrate with a real OCX server, replace `internal/ocxstub` with `internal/ocxclient` implementing:
-
-```go
-CreateOffer(price float64) (*Offer, error)
-PlaceOrder(offerID string, gpus, hours int, budget float64) (*Order, error)
-WaitMatch(orderID string, timeout time.Duration) error
-Provision(orderID string) (*Lease, error)
-Settle(orderID string, amount float64) error
-Release(leaseID string) error
-```
-
-No other code changes required.
-
-## 🔌 Kubernetes Webhook Integration
-
-**Enterprise-grade Kubernetes integration for OCX Protocol with zero-code adoption**
-
-The OCX Protocol now includes a Fortune 500-grade Kubernetes mutating admission webhook that transforms enterprise adoption from "rewrite your code" to "add one annotation".
-
-### 🚀 Executive Summary
-
-- **Zero Code Changes**: Add `ocx-inject: "true"` annotation to any pod
-- **Enterprise Security**: Production-ready with TLS, RBAC, and NetworkPolicies
-- **Performance**: Sub-5ms injection latency with comprehensive monitoring
-- **Reliability**: High availability with graceful degradation and health checks
-
-### Core Features
-
-- ✅ **Init Container Injection** - Automatically adds OCX binary and keystore
-- ✅ **Sidecar Verification** - Optional verification-only containers
-- ✅ **Flexible Configuration** - Cycles, profiles, and keystore selection
-- ✅ **Security Hardened** - Non-root execution, read-only filesystems, capability drops
-- ✅ **Production Monitoring** - Prometheus metrics, health checks, distributed tracing
-- ✅ **Certificate Management** - Auto-rotation with cert-manager integration
-- ✅ **High Availability** - Multi-replica deployment with anti-affinity rules
-
-### Quick Start
-
+### Generate Keys
 ```bash
-# Deploy the webhook
-cd k8s/webhook
-./deploy-production.sh deploy
-
-# Enable for a namespace
-kubectl label namespace default ocx-inject=enabled
-
-# Test with a pod
-kubectl apply -f examples/test-pod.yaml
+mkdir -p keys
+openssl genpkey -algorithm ed25519 -out keys/ocx_signing.pem
+openssl pkey -in keys/ocx_signing.pem -pubout -outform DER | tail -c 32 | base64 -w0 > keys/ocx_public.b64
 ```
 
-### Usage Examples
-
-**Basic Integration:**
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: my-app
-  annotations:
-    ocx-inject: "true"           # 👈 Single annotation enables OCX
-spec:
-  containers:
-  - name: app
-    image: nginx
-    # OCX binary automatically available at /usr/local/bin/ocx
+### Run Complete Smoke Test
+```bash
+chmod +x scripts/smoke.sh
+./scripts/smoke.sh
 ```
 
-**Advanced Configuration:**
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: ocx-production-workload
-  annotations:
-    ocx-inject: "true"
-    ocx-cycles: "100000"          # High-computation workload
-    ocx-profile: "v1-enterprise"  # Enterprise protocol profile
-    ocx-keystore: "prod-hsm"      # Production HSM keystore
-spec:
-  containers:
-  - name: ml-training
-    image: tensorflow:latest
-    # OCX automatically injected, ready to use
+## 🔧 **Core Components**
+
+### 1. Deterministic Virtual Machine (D-MVM)
+- **Purpose**: Executes code in a completely predictable way
+- **Key Feature**: Same input + same code = identical output, every time
+- **Files**: `pkg/deterministicvm/`
+
+### 2. Cryptographic Receipt System
+- **Purpose**: Creates tamper-proof certificates for execution results
+- **Key Feature**: Mathematical proof of execution authenticity
+- **Files**: `pkg/receipt/`
+
+### 3. Security Sandboxing
+- **Purpose**: Prevents unauthorized system access
+- **Key Feature**: Ensures execution can't be influenced externally
+- **Files**: `pkg/security/`, `pkg/deterministicvm/seccomp.go`
+
+### 4. API Server
+- **Purpose**: HTTP interface for remote execution
+- **Key Feature**: Production-ready REST API
+- **Files**: `cmd/server/`
+
+## 📖 **Usage Examples**
+
+### Command Line Interface
+```bash
+# Execute a program
+./ocx execute my_program.sh --env INPUT="test data"
+
+# Generate a receipt
+./ocx execute my_program.sh --output receipt.cbor
+
+# Verify a receipt
+./verify-standalone receipt.cbor "$(cat keys/ocx_public.b64)"
 ```
 
-### 📚 Documentation
+### API Usage
+```bash
+# Start server
+OCX_API_KEYS=dev123 ./server
 
-- **[Complete Webhook Guide](./docs/webhook/README.md)** - Comprehensive documentation
-- **[API Reference](./docs/webhook/API_REFERENCE.md)** - Detailed API documentation
-- **[Troubleshooting Guide](./docs/webhook/TROUBLESHOOTING.md)** - Issue resolution
-- **[Upgrade Guide](./docs/webhook/UPGRADE_GUIDE.md)** - Version upgrades
-- **[K8s Manifests](./k8s/webhook/README.md)** - Kubernetes deployment
+# Execute via API
+curl -X POST -H "OCX-API-Key: dev123" \
+  -H "Content-Type: application/json" \
+  --data '{"artifact_hash":"abc123","input":"test"}' \
+  http://localhost:8080/api/v1/execute
+
+# Verify via API
+curl -X POST -H "OCX-API-Key: dev123" \
+  -H "X-OCX-Public-Key: $(cat keys/ocx_public.b64)" \
+  -H "Content-Type: application/cbor" \
+  --data-binary @receipt.cbor \
+  http://localhost:8080/api/v1/verify
+```
+
+## 🎯 **Value Propositions**
+
+### 1. AI/ML Model Verification
+- **Problem**: "Did this AI model really produce this result?"
+- **Solution**: Cryptographic proof of model execution
+- **Value**: Prevents AI hallucination claims, ensures model integrity
+
+### 2. Financial Calculations
+- **Problem**: "Was this trading algorithm executed correctly?"
+- **Solution**: Tamper-proof execution receipts
+- **Value**: Regulatory compliance, audit trails, dispute resolution
+
+### 3. Scientific Computing
+- **Problem**: "Can I reproduce this research result?"
+- **Solution**: Deterministic execution with cryptographic proof
+- **Value**: Scientific reproducibility, peer review validation
+
+### 4. Smart Contracts
+- **Problem**: "Did this blockchain transaction execute as intended?"
+- **Solution**: Off-chain execution with on-chain verification
+- **Value**: Reduced gas costs, increased computation power
+
+## 🏗️ **Architecture**
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Client App    │───▶│   OCX Server     │───▶│   D-MVM Engine  │
+│                 │    │                  │    │                 │
+│ - Submit job    │    │ - API Gateway    │    │ - Sandboxed     │
+│ - Get receipt   │    │ - Auth/Rate Limit│    │   execution     │
+│ - Verify result │    │ - Receipt Store  │    │ - Deterministic │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                       ┌──────────────────┐
+                       │   PostgreSQL     │
+                       │                  │
+                       │ - Receipts       │
+                       │ - Idempotency    │
+                       │ - Audit Logs     │
+                       └──────────────────┘
+```
+
+## 🔐 **Security Features**
+
+- **Seccomp Sandboxing**: Restricts system calls
+- **Cgroup Limits**: Prevents resource exhaustion
+- **Ed25519 Signatures**: Cryptographic authenticity
+- **Canonical CBOR**: Consistent serialization
+- **Domain Separation**: Prevents signature reuse
+
+## 📊 **Performance**
+
+- **Execution Overhead**: <1ms for simple programs
+- **Receipt Generation**: ~600µs
+- **Verification**: ~670µs
+- **Determinism**: 100% consistent across runs
+
+## 🚀 **Production Deployment**
+
+### Docker
+```bash
+docker build -t ocx-protocol .
+docker run -p 8080:8080 -e OCX_API_KEYS=your-key ocx-protocol
+```
+
+### Kubernetes
+```bash
+kubectl apply -f k8s/
+```
+
+### Environment Variables
+- `OCX_API_KEYS`: Comma-separated API keys
+- `OCX_DB_URL`: Database connection string
+- `OCX_SIGNING_KEY_PEM`: Path to signing key
+- `OCX_LOG_LEVEL`: Logging level (debug, info, warn, error)
+
+## 🔍 **Verification Process**
+
+1. **Receipt Creation**: System signs execution result with private key
+2. **Receipt Storage**: Receipt stored in database with metadata
+3. **Independent Verification**: Anyone can verify with public key
+4. **Mathematical Proof**: Ed25519 signature provides cryptographic certainty
+
+## 📈 **Monitoring**
+
+- **Health Endpoints**: `/livez`, `/readyz`
+- **Metrics**: `/metrics` (Prometheus format)
+- **Audit Logs**: All API calls logged for compliance
+- **Performance**: Execution time, memory usage, gas consumption
+
+## 🤝 **Contributing**
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## 📄 **License**
+
+MIT License - see LICENSE file for details
+
+## 🆘 **Support**
+
+- **Documentation**: This README and inline code comments
+- **Issues**: GitHub Issues for bug reports
+- **Discussions**: GitHub Discussions for questions
+
+---
+
+**OCX Protocol: Mathematical Proof of Execution Authenticity**

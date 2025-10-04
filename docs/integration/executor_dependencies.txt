@@ -1,5 +1,0 @@
-./pkg/programs/killer_apps.go
-./conformance/vectors.go
-./cmd/ocx-simple-demo/main.go
-./cmd/ocx-killer-demo/main.go
-./cmd/ocx-core-server/enhanced_server.go

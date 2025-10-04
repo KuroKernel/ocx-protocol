@@ -1,0 +1,192 @@
+version: '3.9'
+
+services:
+  ocx-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.complete
+    image: ocx-protocol:latest
+    container_name: ocx-server
+    ports:
+      - "8080:8080"
+    environment:
+      # Database Configuration
+      - OCX_DB_URL=postgres://ocx:${OCX_DB_PASSWORD}@postgres:5432/ocx?sslmode=disable
+      - OCX_DB_MAX_CONNECTIONS=50
+      - OCX_DB_MAX_IDLE_CONNECTIONS=10
+      
+      # API Configuration
+      - OCX_API_KEYS=${OCX_API_KEYS}
+      - OCX_RATE_LIMIT_RPS=1000
+      - OCX_RATE_LIMIT_BURST=100
+      - OCX_REQUEST_TIMEOUT=30s
+      - OCX_BODY_SIZE_LIMIT=1048576
+      
+      # Security Configuration
+      - OCX_TLS_ENABLED=true
+      - OCX_TLS_CERT_PATH=/app/certs/server.crt
+      - OCX_TLS_KEY_PATH=/app/certs/server.key
+      
+      # Monitoring Configuration
+      - OCX_METRICS_ENABLED=true
+      - OCX_METRICS_PORT=9090
+      - OCX_LOG_LEVEL=info
+      - OCX_LOG_FORMAT=json
+      
+      # Artifact Resolution Configuration
+      - OCX_ARTIFACT_CACHE_DIR=/var/cache/ocx/artifacts
+      - OCX_ARTIFACT_CACHE_SIZE_GB=10
+      - OCX_ARTIFACT_CACHE_TTL=24h
+      
+      # Deterministic VM Configuration
+      - OCX_VM_TIMEOUT=30s
+      - OCX_VM_MEMORY_LIMIT=67108864
+      - OCX_VM_CYCLE_LIMIT=1000000
+    volumes:
+      - ocx_artifacts:/var/cache/ocx/artifacts
+      - ocx_keys:/app/keys
+      - ocx_certs:/app/certs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      prometheus:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ocx-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ocx-postgres
+    environment:
+      - POSTGRES_DB=ocx
+      - POSTGRES_USER=ocx
+      - POSTGRES_PASSWORD=${OCX_DB_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ocx -d ocx"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ocx-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: ocx-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./ops/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - ocx-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: ocx-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./ops/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./ops/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - ocx-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: ocx-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./ops/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ops/nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - ocx-server
+    restart: unless-stopped
+    networks:
+      - ocx-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.1'
+
+volumes:
+  postgres_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  ocx_artifacts:
+    driver: local
+  ocx_keys:
+    driver: local
+  ocx_certs:
+    driver: local
+  nginx_logs:
+    driver: local
+
+networks:
+  ocx-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

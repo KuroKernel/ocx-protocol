@@ -1,0 +1,30 @@
+{
+  "Version": "OCXv1",
+  "TxID": "tx_1758883023984161329",
+  "ArtifactID": "artifact_customer_workflow.sh",
+  "ExecutionID": "exec_1758883023984163426",
+  "Timestamp": 1758883023,
+  "ExitCode": 0,
+  "GasUsed": 233,
+  "OutputHash": "c03312fb2b8c63b6bcdb4e5b6aecd67120b664111781abc5905d639068f6ffd5",
+  "Evidence": {
+    "StdoutHash": "c03312fb2b8c63b6bcdb4e5b6aecd67120b664111781abc5905d639068f6ffd5",
+    "StderrHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ResourceUsage": {
+      "CPUTimeMs": 1,
+      "MemoryBytes": 4194323,
+      "DiskReadBytes": 0,
+      "DiskWriteBytes": 0
+    },
+    "Environment": [],
+    "StartTime": 1758883023,
+    "EndTime": 1758883023
+  },
+  "Metadata": {
+    "artifact": "customer_workflow.sh",
+    "deterministic": "true",
+    "issuer": "ocx-cli",
+    "version": "OCXv1"
+  },
+  "Signature": "iSTCw9SOXcni+ySVIeZM+InaNRuu2BNB9uPYzf7lSsXvFMtSWCbDQ2qImol4UgiS90xOfhKBXzr9Kr74EXYKBQ=="
+}

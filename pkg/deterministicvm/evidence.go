@@ -15,15 +15,15 @@ import (
 
 // EvidenceV1 represents the evidence schema for OCX execution
 type EvidenceV1 struct {
-	Schema         string `json:"schema"`
-	ArtifactID     string `json:"artifact_id"`
-	ReceiptHash    string `json:"receipt_hash"`
-	EnvHash        string `json:"env_hash"`
-	Seed           string `json:"seed"`
-	Limits         struct {
-		CPUMs     int64 `json:"cpu_ms"`
-		RSSBytes  int64 `json:"rss_bytes"`
-		PidsMax   int   `json:"pids_max"`
+	Schema      string `json:"schema"`
+	ArtifactID  string `json:"artifact_id"`
+	ReceiptHash string `json:"receipt_hash"`
+	EnvHash     string `json:"env_hash"`
+	Seed        string `json:"seed"`
+	Limits      struct {
+		CPUMs    int64 `json:"cpu_ms"`
+		RSSBytes int64 `json:"rss_bytes"`
+		PidsMax  int   `json:"pids_max"`
 	} `json:"limits"`
 	Platform struct {
 		Kernel          string `json:"kernel"`
@@ -31,11 +31,11 @@ type EvidenceV1 struct {
 		ContainerDigest string `json:"container_digest"`
 	} `json:"platform"`
 	Rusage struct {
-		MaxRSS   int64 `json:"max_rss"`
-		Minflt   int64 `json:"minflt"`
-		Majflt   int64 `json:"majflt"`
-		UtimeMs  int64 `json:"utime_ms"`
-		StimeMs  int64 `json:"stime_ms"`
+		MaxRSS  int64 `json:"max_rss"`
+		Minflt  int64 `json:"minflt"`
+		Majflt  int64 `json:"majflt"`
+		UtimeMs int64 `json:"utime_ms"`
+		StimeMs int64 `json:"stime_ms"`
 	} `json:"rusage"`
 	SeccompProfile string `json:"seccomp_profile"`
 	CgroupPath     string `json:"cgroup_path"`
@@ -54,40 +54,40 @@ func emitEvidence(ev EvidenceV1) {
 // EnvHash calculates a deterministic hash of the execution environment
 func EnvHash() string {
 	h := sha256.New()
-	
+
 	write := func(k, v string) {
 		h.Write([]byte(k))
 		h.Write([]byte{0})
 		h.Write([]byte(v))
 		h.Write([]byte{0})
 	}
-	
+
 	// Add OCX version
 	write("OCX_D_MVM_VERSION", "1.0.0")
-	
+
 	// Add locale and timezone
 	write("LOCALE", os.Getenv("LC_ALL"))
 	write("TZ", os.Getenv("TZ"))
 	write("PATH", os.Getenv("PATH"))
-	
+
 	// Add platform information
 	write("GOOS", runtime.GOOS)
 	write("GOARCH", runtime.GOARCH)
-	
+
 	// Add kernel version (Linux only)
 	if runtime.GOOS == "linux" {
 		if kernel, err := getKernelVersion(); err == nil {
 			write("KERNEL", kernel)
 		}
 	}
-	
+
 	// Add libc version (Linux only)
 	if runtime.GOOS == "linux" {
 		if libc, err := getLibcVersion(); err == nil {
 			write("LIBC", libc)
 		}
 	}
-	
+
 	// Walk a short whitelist of system directories
 	whitelistDirs := []string{"/usr/bin", "/lib", "/lib64", "/etc/ocx"}
 	for _, dir := range whitelistDirs {
@@ -102,7 +102,7 @@ func EnvHash() string {
 			})
 		}
 	}
-	
+
 	return "sha256:" + hex.EncodeToString(h.Sum(nil))
 }
 
@@ -159,7 +159,7 @@ func getRusage() (maxRSS, minflt, majflt, utimeMs, stimeMs int64) {
 func CreateEvidence(artifactID, receiptHash, seed string, limits VMConfig) EvidenceV1 {
 	envHash := EnvHash()
 	maxRSS, minflt, majflt, utimeMs, stimeMs := getRusage()
-	
+
 	ev := EvidenceV1{
 		Schema:      "evidence_v1",
 		ArtifactID:  artifactID,
@@ -167,13 +167,13 @@ func CreateEvidence(artifactID, receiptHash, seed string, limits VMConfig) Evide
 		EnvHash:     envHash,
 		Seed:        seed,
 		Limits: struct {
-			CPUMs     int64 `json:"cpu_ms"`
-			RSSBytes  int64 `json:"rss_bytes"`
-			PidsMax   int   `json:"pids_max"`
+			CPUMs    int64 `json:"cpu_ms"`
+			RSSBytes int64 `json:"rss_bytes"`
+			PidsMax  int   `json:"pids_max"`
 		}{
-			CPUMs:     int64(limits.Timeout.Milliseconds()),
-			RSSBytes:  int64(limits.MemoryLimit),
-			PidsMax:   64, // From cgroups config
+			CPUMs:    int64(limits.Timeout.Milliseconds()),
+			RSSBytes: int64(limits.MemoryLimit),
+			PidsMax:  64, // From cgroups config
 		},
 		Platform: struct {
 			Kernel          string `json:"kernel"`
@@ -185,11 +185,11 @@ func CreateEvidence(artifactID, receiptHash, seed string, limits VMConfig) Evide
 			ContainerDigest: "", // Would be set in containerized environments
 		},
 		Rusage: struct {
-			MaxRSS   int64 `json:"max_rss"`
-			Minflt   int64 `json:"minflt"`
-			Majflt   int64 `json:"majflt"`
-			UtimeMs  int64 `json:"utime_ms"`
-			StimeMs  int64 `json:"stime_ms"`
+			MaxRSS  int64 `json:"max_rss"`
+			Minflt  int64 `json:"minflt"`
+			Majflt  int64 `json:"majflt"`
+			UtimeMs int64 `json:"utime_ms"`
+			StimeMs int64 `json:"stime_ms"`
 		}{
 			MaxRSS:  maxRSS,
 			Minflt:  minflt,
@@ -200,7 +200,7 @@ func CreateEvidence(artifactID, receiptHash, seed string, limits VMConfig) Evide
 		SeccompProfile: "ocx-seccomp-v1",
 		CgroupPath:     fmt.Sprintf("ocx.slice/%d", os.Getpid()),
 	}
-	
+
 	return ev
 }
 

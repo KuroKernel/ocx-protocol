@@ -1,0 +1,109 @@
+# OCX Protocol Production Makefile
+
+.PHONY: build clean test demo docker-build docker-run k8s-deploy k8s-clean
+
+# Build all binaries
+build:
+	@echo "Building OCX Protocol..."
+	go build -o ocx ./cmd/ocx
+	go build -o server ./cmd/server
+	go build -o verify-standalone ./cmd/tools/verify-standalone
+	@echo "✅ Build complete"
+
+# Clean build artifacts
+clean:
+	@echo "Cleaning build artifacts..."
+	rm -f ocx server verify-standalone
+	rm -rf out/
+	@echo "✅ Clean complete"
+
+# Run tests
+test:
+	@echo "Running tests..."
+	go test ./... -v
+	@echo "✅ Tests complete"
+
+# Run demo
+demo:
+	@echo "Running OCX Protocol demo..."
+	./simple_demo.sh
+	@echo "✅ Demo complete"
+
+# Build Docker image
+docker-build:
+	@echo "Building Docker image..."
+	docker build -t ocx-protocol:latest .
+	@echo "✅ Docker image built"
+
+# Run Docker container
+docker-run:
+	@echo "Starting OCX Protocol in Docker..."
+	docker run -d \
+		--name ocx-protocol \
+		-p 8080:8080 \
+		-e OCX_API_KEYS=dev123 \
+		-e OCX_LOG_LEVEL=info \
+		ocx-protocol:latest
+	@echo "✅ Container started on port 8080"
+
+# Deploy to Kubernetes
+k8s-deploy:
+	@echo "Deploying to Kubernetes..."
+	kubectl apply -f k8s/
+	@echo "✅ Kubernetes deployment complete"
+
+# Clean Kubernetes deployment
+k8s-clean:
+	@echo "Cleaning Kubernetes deployment..."
+	kubectl delete -f k8s/
+	@echo "✅ Kubernetes cleanup complete"
+
+# Generate keys
+keys:
+	@echo "Generating cryptographic keys..."
+	mkdir -p keys
+	openssl genpkey -algorithm ed25519 -out keys/ocx_signing.pem
+	openssl pkey -in keys/ocx_signing.pem -pubout -outform DER | tail -c 32 | base64 -w0 > keys/ocx_public.b64
+	@echo "✅ Keys generated in keys/ directory"
+
+# Setup PostgreSQL
+postgres:
+	@echo "Starting PostgreSQL..."
+	docker run -d \
+		--name ocx-postgres \
+		-e POSTGRES_PASSWORD=ocx123 \
+		-e POSTGRES_DB=ocx \
+		-e POSTGRES_USER=ocx \
+		-p 5433:5432 \
+		postgres:16
+	@echo "Waiting for PostgreSQL to start..."
+	sleep 5
+	docker exec -i ocx-postgres psql -U ocx -d ocx < database/migrations/0001_init.sql
+	@echo "✅ PostgreSQL setup complete"
+
+# Full production setup
+setup: keys build postgres
+	@echo "🎉 OCX Protocol production setup complete!"
+	@echo ""
+	@echo "Next steps:"
+	@echo "1. Run demo: make demo"
+	@echo "2. Start server: OCX_DB_URL='postgres://ocx:ocx123@localhost:5433/ocx?sslmode=disable' ./server"
+	@echo "3. Or use Docker: make docker-run"
+
+# Help
+help:
+	@echo "OCX Protocol Production Makefile"
+	@echo ""
+	@echo "Available targets:"
+	@echo "  build        - Build all binaries"
+	@echo "  clean        - Clean build artifacts"
+	@echo "  test         - Run tests"
+	@echo "  demo         - Run demonstration"
+	@echo "  keys         - Generate cryptographic keys"
+	@echo "  postgres     - Setup PostgreSQL database"
+	@echo "  setup        - Full production setup"
+	@echo "  docker-build - Build Docker image"
+	@echo "  docker-run   - Run in Docker container"
+	@echo "  k8s-deploy   - Deploy to Kubernetes"
+	@echo "  k8s-clean    - Clean Kubernetes deployment"
+	@echo "  help         - Show this help"

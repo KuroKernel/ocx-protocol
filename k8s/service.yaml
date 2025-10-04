@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ocx-protocol-service
+  labels:
+    app: ocx-protocol
+spec:
+  selector:
+    app: ocx-protocol
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP

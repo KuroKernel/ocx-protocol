@@ -1,0 +1,114 @@
+# OCX Protocol .gitignore
+
+# OCX large/build artifacts
+.ocx/
+receipts/
+**/target/
+node_modules/
+*.log
+*.tmp
+.DS_Store
+
+# local binaries
+/ocx
+/server
+/ocx-server
+/api-server
+/debug-server
+/final-server
+/minimal-server
+/mock-server
+/ocx-complete-demo
+/ocx-core-server
+/ocx-db-server
+/ocx-gpu-test
+/ocx-killer-demo
+/ocx-old
+/ocx-simple-demo
+/ocxctl
+/working-server
+/ultra-minimal-server
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Go modules
+go.sum
+
+# Rust build artifacts
+Cargo.lock
+target/
+**/*.rs.bk
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# Test artifacts
+test_*.txt
+test_*.json
+test_*.cbor
+*_test.log
+*_test.txt
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+logs/
+server.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Backup directories
+backup_before_*
+*_backup
+*_backup_*
+
+# Large archives
+*.tar.gz
+*.zip
+*.rar
+
+# Generated files
+generated/
+gen_*

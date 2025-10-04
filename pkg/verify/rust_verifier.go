@@ -9,8 +9,13 @@ package verify
 */
 import "C"
 import (
+	"encoding/json"
 	"fmt"
+	"time"
 	"unsafe"
+
+	"github.com/fxamacker/cbor/v2"
+	"ocx.local/pkg/receipt"
 )
 
 // RustVerifier implements receipt verification using the Rust libocx-verify library
@@ -26,17 +31,17 @@ func NewRustVerifier() Verifier {
 }
 
 // VerifyReceipt verifies a receipt using the Rust implementation
-func (rv *RustVerifier) VerifyReceipt(receiptData []byte, publicKey []byte) error {
+func (rv *RustVerifier) VerifyReceipt(receiptData []byte, publicKey []byte) (*receipt.ReceiptCore, error) {
 	if !rv.enabled {
-		return fmt.Errorf("rust verifier is disabled")
+		return nil, fmt.Errorf("rust verifier is disabled")
 	}
 
 	if len(receiptData) == 0 {
-		return fmt.Errorf("empty receipt data")
+		return nil, fmt.Errorf("empty receipt data")
 	}
 
 	if len(publicKey) != 32 {
-		return fmt.Errorf("invalid public key length: expected 32 bytes, got %d", len(publicKey))
+		return nil, fmt.Errorf("invalid public key length: expected 32 bytes, got %d", len(publicKey))
 	}
 
 	// Call Rust verification function with detailed error reporting
@@ -51,10 +56,16 @@ func (rv *RustVerifier) VerifyReceipt(receiptData []byte, publicKey []byte) erro
 	if !result {
 		// Get human-readable error message
 		errorMsg := rv.getErrorMessage(errorCode)
-		return fmt.Errorf("rust verification failed: %s (code: %d)", errorMsg, int(errorCode))
+		return nil, fmt.Errorf("rust verification failed: %s (code: %d)", errorMsg, int(errorCode))
 	}
 
-	return nil
+	// Extract receipt core from the verified receipt
+	core, err := rv.extractReceiptCore(receiptData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract receipt core: %w", err)
+	}
+
+	return core, nil
 }
 
 // VerifyReceiptSimple verifies a receipt using embedded key ID (for testing)
@@ -90,8 +101,8 @@ func (rv *RustVerifier) ExtractReceiptFields(receiptData []byte) (*ReceiptFields
 	}
 
 	var fields C.OcxReceiptFields
-	keyIdBuffer := make([]byte, 256)  // Buffer for key ID
-	sigBuffer := make([]byte, 64)     // Buffer for signature
+	keyIdBuffer := make([]byte, 256) // Buffer for key ID
+	sigBuffer := make([]byte, 64)    // Buffer for signature
 
 	errorCode := C.ocx_extract_receipt_fields(
 		(*C.uint8_t)(unsafe.Pointer(&receiptData[0])),
@@ -110,17 +121,17 @@ func (rv *RustVerifier) ExtractReceiptFields(receiptData []byte) (*ReceiptFields
 
 	// Convert C structures to Go structures
 	result := &ReceiptFields{
-		ArtifactHash: make([]byte, 32),
-		InputHash:    make([]byte, 32),
-		OutputHash:   make([]byte, 32),
-		CyclesUsed:   uint64(fields.cycles_used),
-		StartedAt:    uint64(fields.started_at),
-		FinishedAt:   uint64(fields.finished_at),
-		IssuerKeyID:  string(keyIdBuffer[:fields.issuer_key_id_len]),
-		Signature:    sigBuffer[:fields.signature_len],
+		ProgramHash: make([]byte, 32),
+		InputHash:   make([]byte, 32),
+		OutputHash:  make([]byte, 32),
+		GasUsed:     uint64(fields.cycles_used),
+		StartedAt:   uint64(fields.started_at),
+		FinishedAt:  uint64(fields.finished_at),
+		IssuerID:    string(keyIdBuffer[:fields.issuer_key_id_len]),
+		Signature:   sigBuffer[:fields.signature_len],
 	}
 
-	copy(result.ArtifactHash, (*[32]byte)(unsafe.Pointer(&fields.artifact_hash))[:])
+	copy(result.ProgramHash, (*[32]byte)(unsafe.Pointer(&fields.artifact_hash))[:])
 	copy(result.InputHash, (*[32]byte)(unsafe.Pointer(&fields.input_hash))[:])
 	copy(result.OutputHash, (*[32]byte)(unsafe.Pointer(&fields.output_hash))[:])
 
@@ -213,4 +224,86 @@ func (rv *RustVerifier) Enable() {
 // Disable disables the Rust verifier
 func (rv *RustVerifier) Disable() {
 	rv.enabled = false
+}
+
+// extractReceiptCore extracts the core fields from a verified receipt
+func (rv *RustVerifier) extractReceiptCore(receiptData []byte) (*receipt.ReceiptCore, error) {
+	// Parse the receipt data to extract core fields using JSON or CBOR
+	var receiptMap map[string]interface{}
+	if err := json.Unmarshal(receiptData, &receiptMap); err != nil {
+		// If JSON parsing fails, attempt CBOR parsing
+		var cborMap map[string]interface{}
+		if cborErr := cbor.Unmarshal(receiptData, &cborMap); cborErr != nil {
+			return nil, fmt.Errorf("failed to parse receipt as JSON or CBOR: json=%v, cbor=%v", err, cborErr)
+		}
+		receiptMap = cborMap
+	}
+
+	// Extract fields from the parsed receipt
+	core := &receipt.ReceiptCore{
+		Version:     getString(receiptMap, "v", "OCXv1"),
+		TxID:        getString(receiptMap, "tx_id", ""),
+		ArtifactID:  getString(receiptMap, "artifact_id", ""),
+		ExecutionID: getString(receiptMap, "execution_id", ""),
+		Timestamp:   getInt64(receiptMap, "ts", time.Now().Unix()),
+		ExitCode:    getInt(receiptMap, "exit_code", 0),
+		GasUsed:     getUint64(receiptMap, "gas_used", 1000),
+		OutputHash:  getString(receiptMap, "output_hash", ""),
+	}
+
+	return core, nil
+}
+
+// Helper functions for extracting typed values from map
+func getString(m map[string]interface{}, key, defaultValue string) string {
+	if val, ok := m[key]; ok {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return defaultValue
+}
+
+func getInt(m map[string]interface{}, key string, defaultValue int) int {
+	if val, ok := m[key]; ok {
+		switch v := val.(type) {
+		case int:
+			return v
+		case float64:
+			return int(v)
+		case int64:
+			return int(v)
+		}
+	}
+	return defaultValue
+}
+
+func getInt64(m map[string]interface{}, key string, defaultValue int64) int64 {
+	if val, ok := m[key]; ok {
+		switch v := val.(type) {
+		case int64:
+			return v
+		case int:
+			return int64(v)
+		case float64:
+			return int64(v)
+		}
+	}
+	return defaultValue
+}
+
+func getUint64(m map[string]interface{}, key string, defaultValue uint64) uint64 {
+	if val, ok := m[key]; ok {
+		switch v := val.(type) {
+		case uint64:
+			return v
+		case int:
+			return uint64(v)
+		case int64:
+			return uint64(v)
+		case float64:
+			return uint64(v)
+		}
+	}
+	return defaultValue
 }

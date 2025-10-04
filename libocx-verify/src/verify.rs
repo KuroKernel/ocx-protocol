@@ -11,7 +11,8 @@ use crate::{OcxReceipt, VerificationError};
 use crate::receipt::UnsignedReceipt;
 use ring::signature::{UnparsedPublicKey, ED25519};
 use ring::digest::{digest, SHA256};
-use std::time::{SystemTime, UNIX_EPOCH, Duration};
+use ed25519_dalek::{Verifier, VerifyingKey, Signature};
+use std::time::{SystemTime, UNIX_EPOCH, Duration, Instant};
 use std::collections::HashMap;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 
@@ -247,12 +248,13 @@ pub fn verify_receipt_simple(cbor_data: &[u8]) -> Result<OcxReceipt, Verificatio
     verify_receipt(cbor_data, &public_key, false)
 }
 
-// Enhanced Ed25519 verification with dual-library cross-check
+// Enhanced Ed25519 verification with dual-library cross-check for mathematical certainty
 fn verify_ed25519_signature(
     public_key: &[u8],
     signature: &[u8],
     message: &[u8],
 ) -> Result<(), VerificationError> {
+    let start = Instant::now();
     trace!("ed25519_verify: pk_len={}, sig_len={}, msg_len={}", 
            public_key.len(), signature.len(), message.len());
     
@@ -267,7 +269,7 @@ fn verify_ed25519_signature(
         return Err(VerificationError::InvalidSignature);
     }
 
-    // Method 1: ring (primary method)
+    // Method 1: ring (existing primary method)
     let ring_result = {
         let verifier = UnparsedPublicKey::new(&ED25519, public_key);
         let verify_result = verifier.verify(message, signature);
@@ -275,13 +277,49 @@ fn verify_ed25519_signature(
         verify_result.is_ok()
     };
 
-    trace!("verification_result: ring={}", ring_result);
+    // Method 2: ed25519-dalek (dual-library verification for mathematical certainty)
+    let dalek_result = {
+        let vk_result = VerifyingKey::from_bytes(
+            public_key.try_into().map_err(|_| VerificationError::InvalidSignature)?
+        );
+        
+        let sig = Signature::from_bytes(
+            signature.try_into().map_err(|_| VerificationError::InvalidSignature)?
+        );
+        
+        match vk_result {
+            Ok(vk) => {
+                let verify_result = vk.verify(message, &sig);
+                trace!("dalek_verification_result={:?}", verify_result);
+                verify_result.is_ok()
+            },
+            Err(e) => {
+                trace!("dalek_verifying_key_error={:?}", e);
+                false
+            }
+        }
+    };
 
-    if ring_result {
-        trace!("✅ Signature verification passed");
+    trace!("verification_results: ring={}, dalek={}", ring_result, dalek_result);
+
+    // CRITICAL: Both libraries must agree for mathematical certainty
+    if ring_result != dalek_result {
+        // This should NEVER happen - indicates critical security issue
+        trace!("❌ CRITICAL: Crypto library mismatch! Ring: {}, Dalek: {}", ring_result, dalek_result);
+        return Err(VerificationError::InvalidSignature);
+    }
+
+    // Performance monitoring (ensure we maintain <4ms target)
+    let duration = start.elapsed();
+    if duration.as_millis() > 4 {
+        trace!("⚠️ Dual verification took {}ms, target <4ms", duration.as_millis());
+    }
+
+    if ring_result && dalek_result {
+        trace!("✅ Signature verification passed (both libraries agree)");
         Ok(())
     } else {
-        trace!("❌ Signature verification failed");
+        trace!("❌ Signature verification failed (both libraries agree)");
         Err(VerificationError::InvalidSignature)
     }
 }

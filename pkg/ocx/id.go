@@ -16,28 +16,28 @@ import (
 // ---------- Identity Management ----------
 
 type Identity struct {
-	PartyID     ID           `json:"party_id"`
-	Version     Version      `json:"version"`
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at"`
-	Role        string       `json:"role"` // "provider","buyer","arbiter","issuer"
-	DisplayName string       `json:"display_name"`
-	Email       string       `json:"email,omitempty"`
-	Website     string       `json:"website,omitempty"`
-	KYC         *KYCRef      `json:"kyc,omitempty"`
-	Keys        []KeyPair    `json:"keys"`
-	Active      bool         `json:"active"`
-	Sig         *Sig         `json:"sig,omitempty"`
+	PartyID     ID        `json:"party_id"`
+	Version     Version   `json:"version"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Role        string    `json:"role"` // "provider","buyer","arbiter","issuer"
+	DisplayName string    `json:"display_name"`
+	Email       string    `json:"email,omitempty"`
+	Website     string    `json:"website,omitempty"`
+	KYC         *KYCRef   `json:"kyc,omitempty"`
+	Keys        []KeyPair `json:"keys"`
+	Active      bool      `json:"active"`
+	Sig         *Sig      `json:"sig,omitempty"`
 }
 
 type KeyPair struct {
-	KeyID       ID        `json:"key_id"`
-	PublicKey   string    `json:"public_key"`   // base64 encoded
-	PrivateKey  string    `json:"private_key"`  // base64 encoded (encrypted in production)
-	CreatedAt   time.Time `json:"created_at"`
-	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	Revoked     bool      `json:"revoked"`
-	RevokedAt   *time.Time `json:"revoked_at,omitempty"`
+	KeyID      ID         `json:"key_id"`
+	PublicKey  string     `json:"public_key"`  // base64 encoded
+	PrivateKey string     `json:"private_key"` // base64 encoded (encrypted in production)
+	CreatedAt  time.Time  `json:"created_at"`
+	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
+	Revoked    bool       `json:"revoked"`
+	RevokedAt  *time.Time `json:"revoked_at,omitempty"`
 }
 
 // ---------- Key Management ----------
@@ -67,7 +67,6 @@ func (km *KeyManager) GenerateEd25519KeyPair() (*KeyPair, error) {
 		PublicKey:  base64.StdEncoding.EncodeToString(publicKey),
 		PrivateKey: base64.StdEncoding.EncodeToString(privateKey),
 		CreatedAt:  time.Now(),
-		
 	}
 
 	km.keys[keyID] = keyPair
@@ -223,7 +222,7 @@ func (km *KeyManager) UpdateKYC(partyID ID, kycRef *KYCRef) error {
 
 // generateULID generates a ULID (simplified version)
 func generateULID() ID {
-	// In production, use a proper ULID library
+	// Future enhancement: use a proper ULID library
 	// This is a simplified version for demo purposes
 	timestamp := time.Now().UnixMilli()
 	random := make([]byte, 10)

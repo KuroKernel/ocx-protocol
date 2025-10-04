@@ -12,10 +12,10 @@ import (
 
 // SelfTestOut represents the output of the self-test endpoint
 type SelfTestOut struct {
-	ArtifactID    string `json:"artifact_id"`
-	Runs          []struct {
-		Sha256      string `json:"sha256"`
-		DurationNs  int64  `json:"duration_ns"`
+	ArtifactID string `json:"artifact_id"`
+	Runs       []struct {
+		Sha256     string `json:"sha256"`
+		DurationNs int64  `json:"duration_ns"`
 	} `json:"runs"`
 	Deterministic bool   `json:"deterministic"`
 	EnvHash       string `json:"env_hash"`
@@ -34,7 +34,7 @@ func SelfTestHandler(w http.ResponseWriter, r *http.Request) {
 		Input      []byte `json:"input"`
 		Runs       int    `json:"runs"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -69,37 +69,37 @@ func runSelfTest(ctx context.Context, artifactID string, input []byte, runs int)
 
 	// Create a test artifact hash (in real implementation, this would be a real artifact)
 	artifactHash := sha256.Sum256([]byte(artifactID))
-	
+
 	var testRuns []struct {
 		Sha256     string `json:"sha256"`
 		DurationNs int64  `json:"duration_ns"`
 	}
-	
+
 	var firstOutputHash string
 	allDeterministic := true
-	
+
 	// Run the artifact multiple times
 	for i := 0; i < runs; i++ {
 		startTime := time.Now()
-		
+
 		// Execute the artifact
 		result, err := ExecuteArtifact(ctx, artifactHash, input)
 		if err != nil {
 			return nil, fmt.Errorf("execution %d failed: %w", i+1, err)
 		}
-		
+
 		duration := time.Since(startTime)
 		outputHash := fmt.Sprintf("sha256:%x", sha256.Sum256(result.Stdout))
-		
+
 		// Check determinism
 		if i == 0 {
 			firstOutputHash = outputHash
 		} else if outputHash != firstOutputHash {
 			allDeterministic = false
-			log.Printf("Determinism violation detected in run %d: expected %s, got %s", 
+			log.Printf("Determinism violation detected in run %d: expected %s, got %s",
 				i+1, firstOutputHash, outputHash)
 		}
-		
+
 		testRuns = append(testRuns, struct {
 			Sha256     string `json:"sha256"`
 			DurationNs int64  `json:"duration_ns"`
@@ -107,13 +107,13 @@ func runSelfTest(ctx context.Context, artifactID string, input []byte, runs int)
 			Sha256:     outputHash,
 			DurationNs: duration.Nanoseconds(),
 		})
-		
+
 		log.Printf("Run %d: hash=%s, duration=%v", i+1, outputHash, duration)
 	}
-	
+
 	// Get environment hash
 	envHash := EnvHash()
-	
+
 	return &SelfTestOut{
 		ArtifactID:    artifactID,
 		Runs:          testRuns,
@@ -133,7 +133,7 @@ func NegativeTestHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		TestType string `json:"test_type"` // "network", "time", "rng", "filesystem"
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -146,9 +146,9 @@ func NegativeTestHandler(w http.ResponseWriter, r *http.Request) {
 		Error      string `json:"error,omitempty"`
 		DurationMs int64  `json:"duration_ms"`
 	}
-	
+
 	startTime := time.Now()
-	
+
 	switch req.TestType {
 	case "network":
 		result = testNetworkBlocking()
@@ -162,9 +162,9 @@ func NegativeTestHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unknown test type", http.StatusBadRequest)
 		return
 	}
-	
+
 	result.DurationMs = time.Since(startTime).Milliseconds()
-	
+
 	// Return results
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
@@ -178,7 +178,7 @@ func testNetworkBlocking() struct {
 	DurationMs int64  `json:"duration_ms"`
 } {
 	// This would test network access in a real implementation
-	// For now, we'll simulate the test
+	// we'll simulate the test
 	return struct {
 		TestType   string `json:"test_type"`
 		Blocked    bool   `json:"blocked"`

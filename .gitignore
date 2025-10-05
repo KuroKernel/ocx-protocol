@@ -94,10 +94,15 @@ test_*.cbor
 logs/
 server.log
 
-# Environment files
+# Environment files - NEVER commit these
 .env
+.env.*
 .env.local
 .env.*.local
+.env.prod
+.env.production
+.env.development
+.env.test
 
 # Backup directories
 backup_before_*
@@ -112,3 +117,24 @@ backup_before_*
 # Generated files
 generated/
 gen_*
+
+# SECURITY - Private keys and secrets (NEVER COMMIT)
+*.pem
+*.key
+!*.pub
+*.p12
+*.pfx
+keys/
+secrets/
+.secrets/
+**/keys/*.pem
+**/keys/*.key
+ops/keys/
+cmd/server/keys/*.pem
+cmd/server/keys/*.key
+conformance/conformance-keys/*.key
+
+# Keep only public keys and examples
+!keys/README.md
+!keys/.gitkeep
+!.env.example

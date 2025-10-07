@@ -141,3 +141,38 @@ conformance/conformance-keys/*.key
 
 # Local Netlify folder
 .netlify
+
+# Build directories
+build/
+dist/
+out/
+
+# Documentation build artifacts
+docs/_build/
+docs/.doctrees/
+*.pdf.tmp
+
+# Editor configs (keep .editorconfig)
+*.sublime-project
+*.sublime-workspace
+
+# Coverage reports
+*.coverprofile
+cover.out
+cover.html
+
+# Profiling data
+*.prof
+*.pprof
+cpu.prof
+mem.prof
+
+# Benchmarks
+benchmark_*.txt
+bench.out
+
+# Temporary receipts and test data
+/tmp/
+*.cbor.tmp
+receipt_*.cbor
+test_receipt_*

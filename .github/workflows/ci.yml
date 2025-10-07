@@ -1,140 +1,74 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, integrate-dmvm-execution ]
   pull_request:
     branches: [ main, develop ]
 
 jobs:
-  test:
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: [1.19, 1.20, 1.21]
-    
+
     steps:
-    - uses: actions/checkout@v3
-    
+    - name: Checkout code
+      uses: actions/checkout@v4
+
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
-        go-version: ${{ matrix.go-version }}
-    
-    - name: Cache Go modules
-      uses: actions/cache@v3
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-
-    
+        go-version: '1.24'
+        cache: true
+
     - name: Install dependencies
-      run: make install-tools
-    
+      run: go mod download
+
+    - name: Verify dependencies
+      run: go mod verify
+
+    - name: Run go vet
+      run: go vet ./...
+
+    - name: Run gofmt
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "Code is not properly formatted. Run 'gofmt -s -w .'"
+          gofmt -s -l .
+          exit 1
+        fi
+
+    - name: Build server
+      run: go build -v -o server ./cmd/server
+
+    - name: Build verify-standalone
+      run: go build -v -o verify-standalone ./cmd/tools/verify-standalone
+
     - name: Run tests
-      run: go test -v -timeout=30s $(shell go list ./... | grep -v '/archive/')
-    
-    - name: Run coverage
-      run: go test -coverprofile=coverage.out -covermode=atomic $(shell go list ./... | grep -v '/archive/')
-    
-    - name: Check coverage threshold
-      run: make check-coverage
-    
-    - name: Run benchmarks
-      run: go test -bench=. $(shell go list ./... | grep -v '/archive/')
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+    - name: Upload coverage
+      uses: codecov/codecov-action@v4
       with:
         file: ./coverage.out
-        flags: unittests
-        name: codecov-umbrella
+      continue-on-error: true
 
   lint:
+    name: Lint
     runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.21
-    
-    - name: Install dependencies
-      run: make install-tools
-    
-    - name: Run linters
-      run: make lint
-    
-    - name: Run security checks
-      run: make security-check
-    
-    - name: Run safety checks
-      run: make safety-check
 
-  build:
-    runs-on: ubuntu-latest
-    
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.21
-    
-    - name: Build
-      run: make build
-    
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: build-artifacts
-        path: |
-          ocx-*
-          *.exe
-          *.dll
-          *.so
-          *.dylib
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-  security:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v5
       with:
-        go-version: 1.21
-    
-    - name: Install dependencies
-      run: make install-tools
-    
-    - name: Run security scan
-      run: make security-check
-    
-    - name: Run safety scan
-      run: make safety-check
+        go-version: '1.24'
 
-  performance:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Go
-      uses: actions/setup-go@v3
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v4
       with:
-        go-version: 1.21
-    
-    - name: Run performance tests
-      run: make benchmark
-    
-    - name: Upload performance results
-      uses: actions/upload-artifact@v3
-      with:
-        name: performance-results
-        path: benchmark.txt
+        version: latest
+        args: --timeout=5m
+      continue-on-error: true

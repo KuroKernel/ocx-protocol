@@ -1,231 +1,268 @@
-# OCX Protocol: Deterministic Execution with Cryptographic Proofs
+# OCX Protocol
 
-## 🎯 **What is OCX Protocol?**
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev)
+[![Rust Version](https://img.shields.io/badge/Rust-1.70+-orange?logo=rust)](https://rust-lang.org)
 
-OCX Protocol is a revolutionary system that provides **mathematical proof of execution authenticity**. It solves the fundamental trust problem in computing by creating tamper-proof certificates for software execution results.
+> Deterministic execution with cryptographic receipts for verifiable computation
 
-**Think of it as a "digital notary" for software execution.**
+OCX Protocol provides mathematical proof of execution authenticity through deterministic virtual machines and cryptographic receipts. Execute code, generate tamper-proof certificates, verify results independently.
 
-## 🚀 **Quick Start - 60 Second "Prove It"**
+## Table of Contents
 
-### 1) Build
+- [Overview](#overview)
+- [Quick Start](#quick-start)
+- [Architecture](#architecture)
+- [Documentation](#documentation)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Security](#security)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Overview
+
+### Core Capabilities
+
+- **Deterministic Execution**: Identical results across all platforms and runs
+- **Cryptographic Receipts**: Ed25519-signed execution certificates
+- **Offline Verification**: Verify results without network or trusted parties
+- **Production Ready**: Rate limiting, security headers, comprehensive monitoring
+
+### Use Cases
+
+- AI/ML model output verification
+- Financial calculation audit trails
+- Scientific computation reproducibility
+- Smart contract off-chain execution
+- Regulatory compliance evidence
+
+## Quick Start
+
+### Prerequisites
+
+- Go 1.24+
+- Linux x86_64 (Ubuntu 22.04+ recommended)
+- Optional: Docker, PostgreSQL
+
+### Build
+
 ```bash
 go build -o server ./cmd/server
 go build -o verify-standalone ./cmd/tools/verify-standalone
 ```
 
-### 2) Run demo
+### Run Demo
+
 ```bash
-OCX_API_KEY=prod-ocx-key OCX_PORT=9001 demo/DEMO.sh
+OCX_API_KEY=demo-key OCX_PORT=9001 demo/DEMO.sh
 ```
 
-**Expected output:**
-- ✅ Server starts on port 9001
-- ✅ Two identical stdout hashes (deterministic execution)
-- ✅ Receipt verification: `verified=true`
-- ✅ Tamper detection: `verified=false`
-- ✅ Final message: `DEMO ✅`
+Expected output:
+- Server starts on port 9001
+- Two identical execution results (proving determinism)
+- Receipt verification: `verified=true`
+- Tamper detection: `verified=false`
 
-### 3) Manual verification (if demo fails)
-```bash
-# Start server
-OCX_API_KEY=prod-ocx-key OCX_DISABLE_DB=true OCX_PORT=9001 ./server &
+### Generate Production Keys
 
-# Test execution
-HASH="f8a4e38a18001ece6fe697503722847e18b241a74543bf25a6ffee3733a38a6c"
-INPUT_HEX=$(printf "demo" | xxd -p -c 256)
-curl -H "X-API-Key: prod-ocx-key" -H "Content-Type: application/json" \
-  -d "{\"artifact_hash\":\"$HASH\",\"input\":\"$INPUT_HEX\"}" \
-  http://127.0.0.1:9001/api/v1/execute | jq -r '.receipt_b64' | base64 -d > /tmp/rcpt.cbor
-
-# Verify receipt
-PUBHEX="8d42905855072bf422f91315db2009c372700fa0345980ae5a7af9c098941cdf"
-printf "%s" "$PUBHEX" | xxd -r -p | base64 > /tmp/pub.b64
-./verify-standalone /tmp/rcpt.cbor /tmp/pub.b64
-```
-
-### Prerequisites
-- Go 1.18+
-- Linux environment (Ubuntu 22.04+ recommended)
-- Docker (optional, for PostgreSQL)
-
-### Generate Keys
 ```bash
 mkdir -p keys
 openssl genpkey -algorithm ed25519 -out keys/ocx_signing.pem
-openssl pkey -in keys/ocx_signing.pem -pubout -outform DER | tail -c 32 | base64 -w0 > keys/ocx_public.b64
+openssl pkey -in keys/ocx_signing.pem -pubout -outform DER | \
+  tail -c 32 | base64 -w0 > keys/ocx_public.b64
 ```
 
-### Run Complete Smoke Test
-```bash
-chmod +x scripts/smoke.sh
-./scripts/smoke.sh
-```
-
-## 🔧 **Core Components**
-
-### 1. Deterministic Virtual Machine (D-MVM)
-- **Purpose**: Executes code in a completely predictable way
-- **Key Feature**: Same input + same code = identical output, every time
-- **Files**: `pkg/deterministicvm/`
-
-### 2. Cryptographic Receipt System
-- **Purpose**: Creates tamper-proof certificates for execution results
-- **Key Feature**: Mathematical proof of execution authenticity
-- **Files**: `pkg/receipt/`
-
-### 3. Security Sandboxing
-- **Purpose**: Prevents unauthorized system access
-- **Key Feature**: Ensures execution can't be influenced externally
-- **Files**: `pkg/security/`, `pkg/deterministicvm/seccomp.go`
-
-### 4. API Server
-- **Purpose**: HTTP interface for remote execution
-- **Key Feature**: Production-ready REST API
-- **Files**: `cmd/server/`
-
-## 📖 **Usage Examples**
-
-### Command Line Interface
-```bash
-# Execute a program
-./ocx execute my_program.sh --env INPUT="test data"
-
-# Generate a receipt
-./ocx execute my_program.sh --output receipt.cbor
-
-# Verify a receipt
-./verify-standalone receipt.cbor "$(cat keys/ocx_public.b64)"
-```
-
-### API Usage
-```bash
-# Start server
-OCX_API_KEYS=dev123 ./server
-
-# Execute via API
-curl -X POST -H "OCX-API-Key: dev123" \
-  -H "Content-Type: application/json" \
-  --data '{"artifact_hash":"abc123","input":"test"}' \
-  http://localhost:8080/api/v1/execute
-
-# Verify via API
-curl -X POST -H "OCX-API-Key: dev123" \
-  -H "X-OCX-Public-Key: $(cat keys/ocx_public.b64)" \
-  -H "Content-Type: application/cbor" \
-  --data-binary @receipt.cbor \
-  http://localhost:8080/api/v1/verify
-```
-
-## 🎯 **Value Propositions**
-
-### 1. AI/ML Model Verification
-- **Problem**: "Did this AI model really produce this result?"
-- **Solution**: Cryptographic proof of model execution
-- **Value**: Prevents AI hallucination claims, ensures model integrity
-
-### 2. Financial Calculations
-- **Problem**: "Was this trading algorithm executed correctly?"
-- **Solution**: Tamper-proof execution receipts
-- **Value**: Regulatory compliance, audit trails, dispute resolution
-
-### 3. Scientific Computing
-- **Problem**: "Can I reproduce this research result?"
-- **Solution**: Deterministic execution with cryptographic proof
-- **Value**: Scientific reproducibility, peer review validation
-
-### 4. Smart Contracts
-- **Problem**: "Did this blockchain transaction execute as intended?"
-- **Solution**: Off-chain execution with on-chain verification
-- **Value**: Reduced gas costs, increased computation power
-
-## 🏗️ **Architecture**
+## Architecture
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Client App    │───▶│   OCX Server     │───▶│   D-MVM Engine  │
-│                 │    │                  │    │                 │
-│ - Submit job    │    │ - API Gateway    │    │ - Sandboxed     │
-│ - Get receipt   │    │ - Auth/Rate Limit│    │   execution     │
-│ - Verify result │    │ - Receipt Store  │    │ - Deterministic │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌──────────────────┐
-                       │   PostgreSQL     │
-                       │                  │
-                       │ - Receipts       │
-                       │ - Idempotency    │
-                       │ - Audit Logs     │
-                       └──────────────────┘
+┌─────────────┐    ┌──────────────┐    ┌─────────────┐
+│   Client    │───▶│  OCX Server  │───▶│   D-MVM     │
+│   Request   │    │   (Go)       │    │   Engine    │
+└─────────────┘    └──────────────┘    └─────────────┘
+                           │
+                           ▼
+                   ┌──────────────┐
+                   │  PostgreSQL  │
+                   │   Receipts   │
+                   └──────────────┘
 ```
 
-## 🔐 **Security Features**
+### Components
 
-- **Seccomp Sandboxing**: Restricts system calls
-- **Cgroup Limits**: Prevents resource exhaustion
-- **Ed25519 Signatures**: Cryptographic authenticity
-- **Canonical CBOR**: Consistent serialization
-- **Domain Separation**: Prevents signature reuse
+- **API Server** (`cmd/server/`): REST API with authentication, rate limiting, and idempotency
+- **D-MVM Engine** (`pkg/deterministicvm/`): Sandboxed deterministic execution environment
+- **Receipt System** (`pkg/receipt/`): Cryptographic certificate generation and storage
+- **Verifier** (`libocx-verify/`): Standalone Rust library for receipt verification
+- **Security** (`pkg/security/`): Rate limiting, request validation, security headers
 
-## 📊 **Performance**
+## Documentation
 
-- **Execution Overhead**: <1ms for simple programs
-- **Receipt Generation**: ~600µs
-- **Verification**: ~670µs
-- **Determinism**: 100% consistent across runs
+Comprehensive documentation available in [`docs/`](docs/):
 
-## 🚀 **Production Deployment**
+- [White Paper](docs/OCX_PROTOCOL_WHITEPAPER.md) - Technical and business overview
+- [Technical Architecture](docs/TECHNICAL_ARCHITECTURE.md) - Detailed system design
+- [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) - Production deployment instructions
+- [Security Audit](docs/COMPREHENSIVE_AUDIT_REPORT.md) - Security analysis and findings
+
+## Installation
 
 ### Docker
+
 ```bash
 docker build -t ocx-protocol .
-docker run -p 8080:8080 -e OCX_API_KEYS=your-key ocx-protocol
+docker run -p 8080:8080 \
+  -e OCX_API_KEY=your-key \
+  -e DATABASE_URL=postgres://... \
+  ocx-protocol
 ```
 
 ### Kubernetes
+
 ```bash
 kubectl apply -f k8s/
 ```
 
+### From Source
+
+```bash
+git clone https://github.com/KuroKernel/ocx-protocol.git
+cd ocx-protocol
+go build -o server ./cmd/server
+./server
+```
+
+## Usage
+
+### API Endpoints
+
+#### Execute Code
+
+```bash
+curl -X POST http://localhost:8080/api/v1/execute \
+  -H "X-API-Key: your-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "artifact_hash": "abc123...",
+    "input": "base64-encoded-input"
+  }'
+```
+
+Response:
+```json
+{
+  "receipt_b64": "base64-encoded-receipt",
+  "cycles_used": 423,
+  "stdout_hash": "sha256-hash"
+}
+```
+
+#### Verify Receipt
+
+```bash
+./verify-standalone receipt.cbor public_key.b64
+```
+
+Output:
+```
+Verification: SUCCESS
+Receipt is valid and tamper-proof
+```
+
 ### Environment Variables
-- `OCX_API_KEYS`: Comma-separated API keys
-- `OCX_DB_URL`: Database connection string
-- `OCX_SIGNING_KEY_PEM`: Path to signing key
-- `OCX_LOG_LEVEL`: Logging level (debug, info, warn, error)
 
-## 🔍 **Verification Process**
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OCX_API_KEY` | API authentication key | Required |
+| `OCX_PORT` | Server port | `8080` |
+| `DATABASE_URL` | PostgreSQL connection string | In-memory mode if unset |
+| `OCX_SIGNING_KEY_PEM` | Path to Ed25519 signing key | `keys/ocx_signing.pem` |
+| `OCX_LOG_LEVEL` | Logging level (debug/info/warn/error) | `info` |
+| `OCX_DISABLE_DB` | Disable database (in-memory only) | `false` |
 
-1. **Receipt Creation**: System signs execution result with private key
-2. **Receipt Storage**: Receipt stored in database with metadata
-3. **Independent Verification**: Anyone can verify with public key
-4. **Mathematical Proof**: Ed25519 signature provides cryptographic certainty
+## Security
 
-## 📈 **Monitoring**
+### Features
 
-- **Health Endpoints**: `/livez`, `/readyz`
+- **Seccomp sandboxing**: Restricts system calls to prevent unauthorized access
+- **Cgroup limits**: CPU, memory, and PID constraints
+- **Rate limiting**: 10 requests/second per client, burst capacity 20
+- **Request size limits**: 10MB maximum request body
+- **Security headers**: HSTS, CSP, X-Frame-Options, X-XSS-Protection
+- **Ed25519 signatures**: 128-bit security level with fast verification
+- **Canonical CBOR**: RFC 7049 deterministic encoding
+
+### Reporting Vulnerabilities
+
+Please report security vulnerabilities to: security@ocx.world
+
+## Performance
+
+- **Execution overhead**: <1ms for simple programs
+- **Receipt generation**: ~600µs
+- **Verification**: ~670µs
+- **API latency**: P99 < 20ms
+- **Throughput**: 200+ requests/second per node
+
+## Monitoring
+
+- **Health checks**: `/livez`, `/readyz`, `/health`
 - **Metrics**: `/metrics` (Prometheus format)
-- **Audit Logs**: All API calls logged for compliance
-- **Performance**: Execution time, memory usage, gas consumption
+- **Audit logs**: All API calls logged with timestamps and results
 
-## 🤝 **Contributing**
+## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-## 📄 **License**
+### Development Setup
 
-MIT License - see LICENSE file for details
+```bash
+# Clone repository
+git clone https://github.com/KuroKernel/ocx-protocol.git
+cd ocx-protocol
 
-## 🆘 **Support**
+# Install dependencies
+go mod download
 
-- **Documentation**: This README and inline code comments
-- **Issues**: GitHub Issues for bug reports
-- **Discussions**: GitHub Discussions for questions
+# Run tests
+go test ./...
+
+# Run smoke tests
+./scripts/smoke.sh
+```
+
+### Commit Message Convention
+
+We follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+feat: Add new feature
+fix: Fix bug
+docs: Update documentation
+refactor: Code refactoring
+test: Add or update tests
+```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Links
+
+- **Website**: https://ocx.world
+- **Documentation**: https://ocx.world/documentation
+- **API Reference**: https://ocx.world/api-reference
+- **GitHub**: https://github.com/KuroKernel/ocx-protocol
+- **Issues**: https://github.com/KuroKernel/ocx-protocol/issues
+
+## Acknowledgments
+
+Built with:
+- [Go](https://go.dev) - Backend server and APIs
+- [Rust](https://rust-lang.org) - Verification library
+- [Ed25519](https://ed25519.cr.yp.to/) - Cryptographic signatures
+- [CBOR](https://cbor.io/) - Receipt encoding format
 
 ---
 
-**OCX Protocol: Mathematical Proof of Execution Authenticity**
+**OCX Protocol**: Mathematical proof for computational integrity

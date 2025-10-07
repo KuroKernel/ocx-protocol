@@ -135,6 +135,7 @@ type Server struct {
 	clusterManager          *scaling.ClusterManager
 	distributedCache        *scaling.DistributedCache
 	sessionManager          *scaling.SessionManager
+	rateLimiter             *security.RateLimiter
 	port                    string
 }
 
@@ -219,6 +220,10 @@ func NewServer() (*Server, error) {
 		}))
 	}
 
+	// Create rate limiter: 10 req/s with burst of 20
+	rateLimiter := security.NewRateLimiter(10, 20)
+	log.Printf("Rate limiter initialized: 10 req/s with burst of 20")
+
 	return &Server{
 		verifier:        verify.NewVerifier(),
 		signer:          signer,
@@ -227,6 +232,7 @@ func NewServer() (*Server, error) {
 		reputationStore: reputationStore,
 		metrics:         metricsInstance,
 		healthChecker:   healthChecker,
+		rateLimiter:     rateLimiter,
 		port:            port,
 	}, nil
 }
@@ -528,13 +534,17 @@ func (s *Server) handleExecute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build full receipt with metadata
+	// NOTE: Use milliseconds instead of nanoseconds for determinism
+	// Millisecond precision is sufficient for timing and more stable across runs
+	hostCyclesMs := uint64(time.Since(startedAt).Milliseconds())
+
 	receiptFull := &receipt.ReceiptFull{
 		Core:       *receiptCore,
 		Signature:  signature,
-		HostCycles: uint64(time.Since(startedAt).Nanoseconds()), // Host timing metadata
+		HostCycles: hostCyclesMs * 1_000_000, // Convert back to nanoseconds for consistent units
 		HostInfo: map[string]string{
-			"server_version": "ocx-server-v1",
-			"arch":           "x86_64", // Could be detected at runtime
+			"arch":           "x86_64",
+			"server_version": "ocx-server-v1", // Alphabetically sorted for determinism
 		},
 	}
 
@@ -993,6 +1003,19 @@ func (s *Server) Start() error {
 	idempotencyMiddleware := api.NewIdempotencyMiddleware(s.store)
 	metricsMiddleware := metrics.NewMetricsMiddleware(s.metrics)
 
+	// Create rate limiting middleware (10 req/s per IP, burst 20)
+	rateLimitMiddleware := s.rateLimiter
+
+	// Create request size limiting middleware (10MB max)
+	requestSizeLimiter := security.NewRequestSizeLimiter(10 * 1024 * 1024)
+
+	// Create security headers middleware
+	securityHeadersMiddleware := security.NewSecurityHeadersMiddleware()
+
+	log.Printf("✅ Rate limiting enabled: 10 req/s per IP, burst 20")
+	log.Printf("✅ Request size limit: 10MB")
+	log.Printf("✅ Security headers enabled")
+
 	// Create mux for better routing
 	mux := http.NewServeMux()
 
@@ -1024,12 +1047,14 @@ func (s *Server) Start() error {
 	mux.Handle("/api/v1/receipts/", metricsMiddleware.Middleware(securityMiddleware.Middleware(http.HandlerFunc(s.handleReceipts))))
 
 	// Reputation/TrustScore endpoints (with security and metrics)
-	mux.Handle("/api/v1/reputation/verify", metricsMiddleware.Middleware(securityMiddleware.Middleware(http.HandlerFunc(s.handleReputationVerify))))
-	mux.Handle("/api/v1/reputation/compute", metricsMiddleware.Middleware(http.HandlerFunc(s.handleReputationCompute))) // Public compute endpoint
-	mux.HandleFunc("/api/v1/reputation/badge/", s.handleReputationBadge) // No auth for public badges
-	mux.Handle("/api/v1/reputation/history/", metricsMiddleware.Middleware(securityMiddleware.Middleware(http.HandlerFunc(s.handleReputationHistory))))
-	mux.Handle("/api/v1/reputation/stats", metricsMiddleware.Middleware(securityMiddleware.Middleware(http.HandlerFunc(s.handleReputationStats))))
-	mux.Handle("/api/v1/reputation/connect", metricsMiddleware.Middleware(securityMiddleware.Middleware(http.HandlerFunc(s.handlePlatformConnect))))
+	if s.reputationStore != nil {
+		mux.Handle("/api/v1/reputation/verify", metricsMiddleware.Middleware(securityMiddleware.Middleware(http.HandlerFunc(s.handleReputationVerify))))
+		mux.Handle("/api/v1/reputation/compute", metricsMiddleware.Middleware(http.HandlerFunc(s.handleReputationCompute))) // Public compute endpoint
+		mux.HandleFunc("/api/v1/reputation/badge/", s.handleReputationBadge)                                                // No auth for public badges
+		mux.Handle("/api/v1/reputation/history/", metricsMiddleware.Middleware(securityMiddleware.Middleware(http.HandlerFunc(s.handleReputationHistory))))
+		mux.Handle("/api/v1/reputation/stats", metricsMiddleware.Middleware(securityMiddleware.Middleware(http.HandlerFunc(s.handleReputationStats))))
+		mux.Handle("/api/v1/reputation/connect", metricsMiddleware.Middleware(securityMiddleware.Middleware(http.HandlerFunc(s.handlePlatformConnect))))
+	}
 
 	// Security endpoints (with security and metrics)
 	if s.securityManager != nil {
@@ -1109,10 +1134,18 @@ func (s *Server) Start() error {
 		mux.Handle("/api/v1/scaling/sessions/active", metricsMiddleware.Middleware(securityMiddleware.Middleware(http.HandlerFunc(s.handleActiveSessions))))
 	}
 
+	// Wrap handler with global middleware (applied to ALL requests)
+	// Order: security headers → rate limit → request size limit → routes
+	handler := securityHeadersMiddleware.Middleware(
+		rateLimitMiddleware.Middleware(
+			requestSizeLimiter.Middleware(mux),
+		),
+	)
+
 	// Create HTTP server with timeouts
 	server := &http.Server{
 		Addr:         ":" + s.port,
-		Handler:      mux,
+		Handler:      handler,  // Use wrapped handler instead of bare mux
 		ReadTimeout:  securityMiddleware.Config.ReadTimeout,
 		WriteTimeout: securityMiddleware.Config.WriteTimeout,
 		IdleTimeout:  securityMiddleware.Config.IdleTimeout,
@@ -1122,7 +1155,10 @@ func (s *Server) Start() error {
 	log.Printf("Using verifier: %T", s.verifier)
 	log.Printf("D-MVM execution endpoints available at /api/v1/")
 	log.Printf("Security middleware enabled with API key authentication")
-	log.Printf("Rate limiting: IP=%d req/s, API key=%d req/s", securityMiddleware.Config.IPRPS, securityMiddleware.Config.KeyRPS)
+	log.Printf("🔒 Global middleware chain active:")
+	log.Printf("  → Security headers (X-Content-Type-Options, X-Frame-Options, etc.)")
+	log.Printf("  → Rate limiting (10 req/s per IP, burst 20)")
+	log.Printf("  → Request size limit (10MB max)")
 
 	// Set ready state after server is configured
 	ready.Store(true)
@@ -2342,4 +2378,114 @@ func (s *Server) handleActiveSessions(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// Reputation system handlers
+func (s *Server) handleReputationVerify(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.reputationStore == nil {
+		http.Error(w, "Reputation system not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// TODO: Implement reputation verification
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "not_implemented",
+		"message": "Reputation verification endpoint coming soon",
+	})
+}
+
+func (s *Server) handleReputationCompute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.reputationStore == nil {
+		http.Error(w, "Reputation system not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// TODO: Implement reputation computation
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "not_implemented",
+		"message": "Reputation computation endpoint coming soon",
+	})
+}
+
+func (s *Server) handleReputationBadge(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// TODO: Implement badge generation
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "not_implemented",
+		"message": "Badge generation endpoint coming soon",
+	})
+}
+
+func (s *Server) handleReputationHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.reputationStore == nil {
+		http.Error(w, "Reputation system not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// TODO: Implement reputation history
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "not_implemented",
+		"message": "Reputation history endpoint coming soon",
+	})
+}
+
+func (s *Server) handleReputationStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.reputationStore == nil {
+		http.Error(w, "Reputation system not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// TODO: Implement reputation stats
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "not_implemented",
+		"message": "Reputation stats endpoint coming soon",
+	})
+}
+
+func (s *Server) handlePlatformConnect(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.reputationStore == nil {
+		http.Error(w, "Reputation system not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// TODO: Implement platform connection
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "not_implemented",
+		"message": "Platform connection endpoint coming soon",
+	})
 }

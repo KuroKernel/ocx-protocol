@@ -74,7 +74,7 @@ const About = () => {
           </p>
 
           <a
-            href="https://github.com/your-org/ocx-protocol"
+            href="https://github.com/KuroKernel/ocx-protocol"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center px-6 py-3 bg-black text-white rounded hover:bg-gray-800 transition-colors"

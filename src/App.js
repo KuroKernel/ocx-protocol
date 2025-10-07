@@ -8,9 +8,9 @@ import Contact from './pages/Contact';
 import APIReference from './pages/APIReference';
 import Status from './pages/Status';
 import Support from './pages/Support';
-import TestPage from './pages/TestPage';
 
 const API_BASE = process.env.NODE_ENV === 'production' ? 'https://api.ocx.world' : 'http://localhost:8080';
+const API_AVAILABLE = false; // Set to true when backend is deployed
 
 const OCXLanding = () => {
   const [currentPage, setCurrentPage] = useState('home');
@@ -27,12 +27,15 @@ const OCXLanding = () => {
     receipt_blob: ''
   });
 
-  // Fetch receipts on component mount
+  // Fetch receipts on component mount (only if API available)
   useEffect(() => {
-    fetchReceipts();
+    if (API_AVAILABLE) {
+      fetchReceipts();
+    }
   }, []);
 
   const fetchReceipts = async () => {
+    if (!API_AVAILABLE) return;
     try {
       const response = await fetch(`${API_BASE}/api/v1/receipts`);
       const data = await response.json();
@@ -43,6 +46,10 @@ const OCXLanding = () => {
   };
 
   const handleExecute = async () => {
+    if (!API_AVAILABLE) {
+      setDemoResult({ error: 'Live API coming soon. Download and run locally to try OCX Protocol.' });
+      return;
+    }
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/api/v1/execute`, {
@@ -61,6 +68,10 @@ const OCXLanding = () => {
   };
 
   const handleVerify = async () => {
+    if (!API_AVAILABLE) {
+      setVerifyResult({ valid: false, reason: 'Live API coming soon. Download and run locally to try OCX Protocol.' });
+      return;
+    }
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/api/v1/verify`, {
@@ -102,8 +113,6 @@ const OCXLanding = () => {
       return <Status />;
     } else if (currentPage === 'support') {
       return <Support />;
-    } else if (currentPage === 'test') {
-      return <TestPage />;
     } else {
       return renderHomeContent();
     }
@@ -460,53 +469,57 @@ const OCXLanding = () => {
         </div>
       </section>
 
-      {/* Pricing */}
+      {/* Deployment Options */}
       <section id="pricing" className="py-32 bg-gray-50">
         <div className="max-w-6xl mx-auto px-8">
           <h2 className="text-5xl font-light tracking-tight text-black mb-20 text-center">
-            Transparent pricing
+            Deployment options
           </h2>
-          
+
           <div className="grid lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <div className="border border-gray-200 rounded-sm p-10">
-              <h3 className="text-xl font-medium text-black mb-3">Development</h3>
-              <div className="text-4xl font-light text-black mb-8">Free</div>
+            <div className="border border-gray-200 rounded-sm p-10 bg-white">
+              <h3 className="text-xl font-medium text-black mb-3">Self-Hosted</h3>
+              <div className="text-4xl font-light text-black mb-8">Open Source</div>
               <ul className="space-y-4 mb-10">
                 <li className="flex items-center text-gray-600">
                   <Check className="w-4 h-4 text-black mr-4" />
-                  1M verifications/month
+                  MIT Licensed
                 </li>
                 <li className="flex items-center text-gray-600">
                   <Check className="w-4 h-4 text-black mr-4" />
-                  100k receipts stored
+                  Unlimited usage
+                </li>
+                <li className="flex items-center text-gray-600">
+                  <Check className="w-4 h-4 text-black mr-4" />
+                  Full control over data
                 </li>
                 <li className="flex items-center text-gray-600">
                   <Check className="w-4 h-4 text-black mr-4" />
                   Community support
                 </li>
               </ul>
-              <button 
-                onClick={() => navigateToPage('contact')}
+              <button
+                onClick={() => navigateToPage('documentation')}
                 className="w-full border border-black text-black py-4 rounded-sm hover:bg-black hover:text-white transition-colors"
               >
-                Start Building
+                Get Started
               </button>
             </div>
-            
+
             <div className="border-2 border-black rounded-sm p-10 relative bg-white">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="bg-black text-white px-6 py-2 rounded-sm text-sm font-medium">RECOMMENDED</span>
+                <span className="bg-black text-white px-6 py-2 rounded-sm text-sm font-medium">MANAGED</span>
               </div>
-              <h3 className="text-xl font-medium text-black mb-3">Professional</h3>
-              <div className="text-4xl font-light text-black mb-8">$299<span className="text-xl text-gray-600">/mo</span></div>
+              <h3 className="text-xl font-medium text-black mb-3">Hosted Service</h3>
+              <div className="text-4xl font-light text-black mb-8">Contact Us</div>
               <ul className="space-y-4 mb-10">
                 <li className="flex items-center text-gray-600">
                   <Check className="w-4 h-4 text-black mr-4" />
-                  20M verifications/month
+                  Fully managed infrastructure
                 </li>
                 <li className="flex items-center text-gray-600">
                   <Check className="w-4 h-4 text-black mr-4" />
-                  2M receipts stored
+                  Automatic scaling
                 </li>
                 <li className="flex items-center text-gray-600">
                   <Check className="w-4 h-4 text-black mr-4" />
@@ -517,36 +530,36 @@ const OCXLanding = () => {
                   Priority support
                 </li>
               </ul>
-              <button 
+              <button
                 onClick={() => navigateToPage('contact')}
                 className="w-full bg-black text-white py-4 rounded-sm hover:bg-gray-900 transition-colors"
               >
-                Start Trial
+                Request Pricing
               </button>
             </div>
-            
-            <div className="border border-gray-200 rounded-sm p-10">
+
+            <div className="border border-gray-200 rounded-sm p-10 bg-white">
               <h3 className="text-xl font-medium text-black mb-3">Enterprise</h3>
               <div className="text-4xl font-light text-black mb-8">Custom</div>
               <ul className="space-y-4 mb-10">
-                <li className="flex items-center text-gray-600">
-                  <Check className="w-4 h-4 text-black mr-4" />
-                  Unlimited verifications
-                </li>
                 <li className="flex items-center text-gray-600">
                   <Check className="w-4 h-4 text-black mr-4" />
                   On-premises deployment
                 </li>
                 <li className="flex items-center text-gray-600">
                   <Check className="w-4 h-4 text-black mr-4" />
-                  SSO integration
+                  Air-gapped support
                 </li>
                 <li className="flex items-center text-gray-600">
                   <Check className="w-4 h-4 text-black mr-4" />
-                  Dedicated support
+                  Custom SLAs
+                </li>
+                <li className="flex items-center text-gray-600">
+                  <Check className="w-4 h-4 text-black mr-4" />
+                  Dedicated engineering
                 </li>
               </ul>
-              <button 
+              <button
                 onClick={() => navigateToPage('contact')}
                 className="w-full border border-black text-black py-4 rounded-sm hover:bg-black hover:text-white transition-colors"
               >
@@ -617,7 +630,7 @@ const OCXLanding = () => {
             <div>
               <h4 className="font-medium text-black mb-6">Resources</h4>
               <ul className="space-y-4 text-gray-600">
-                <li><a href="https://github.com/ocx-protocol/ocx" className="hover:text-black transition-colors">GitHub</a></li>
+                <li><a href="https://github.com/KuroKernel/ocx-protocol" target="_blank" rel="noopener noreferrer" className="hover:text-black transition-colors">GitHub</a></li>
                 <li><button onClick={() => navigateToPage('status')} className="hover:text-black transition-colors">Status</button></li>
                 <li><button onClick={() => navigateToPage('support')} className="hover:text-black transition-colors">Support</button></li>
               </ul>
@@ -665,19 +678,13 @@ const OCXLanding = () => {
               >
                 Pricing
               </button>
-              <button 
-                onClick={() => navigateToPage('documentation')} 
+              <button
+                onClick={() => navigateToPage('documentation')}
                 className={`transition-colors ${currentPage === 'documentation' ? 'text-black' : 'text-gray-600 hover:text-black'}`}
               >
                 Documentation
               </button>
-              <button 
-                onClick={() => navigateToPage('test')}
-                className="bg-red-500 text-white px-6 py-2 rounded-sm hover:bg-red-600 transition-colors mr-4"
-              >
-                Test
-              </button>
-              <button 
+              <button
                 onClick={() => navigateToPage('contact')}
                 className="bg-black text-white px-6 py-2 rounded-sm hover:bg-gray-900 transition-colors"
               >

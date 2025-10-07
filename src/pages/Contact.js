@@ -25,7 +25,7 @@ const Contact = () => {
             </a>
 
             <a
-              href="https://github.com/your-org/ocx-protocol"
+              href="https://github.com/KuroKernel/ocx-protocol"
               target="_blank"
               rel="noopener noreferrer"
               className="border-2 border-gray-200 p-8 rounded hover:border-black transition-colors group"
@@ -50,7 +50,7 @@ const Contact = () => {
           <div className="border-l-4 border-black pl-6">
             <h3 className="font-medium text-black mb-2">Technical documentation</h3>
             <p className="text-gray-700">
-              Check the <a href="https://github.com/your-org/ocx-protocol" className="underline">README</a> and
+              Check the <a href="https://github.com/KuroKernel/ocx-protocol" className="underline">README</a> and
               inline code documentation for technical details, API reference, and deployment guides.
             </p>
           </div>

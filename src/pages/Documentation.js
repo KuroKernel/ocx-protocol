@@ -17,7 +17,7 @@ const Documentation = () => {
 
           <div className="grid md:grid-cols-2 gap-8">
             <a
-              href="https://github.com/your-org/ocx-protocol#quick-start"
+              href="https://github.com/KuroKernel/ocx-protocol#quick-start"
               target="_blank"
               rel="noopener noreferrer"
               className="border-2 border-gray-200 p-8 rounded hover:border-black transition-colors group"
@@ -28,7 +28,7 @@ const Documentation = () => {
             </a>
 
             <a
-              href="https://github.com/your-org/ocx-protocol/tree/main/cmd"
+              href="https://github.com/KuroKernel/ocx-protocol/tree/main/cmd"
               target="_blank"
               rel="noopener noreferrer"
               className="border-2 border-gray-200 p-8 rounded hover:border-black transition-colors group"
@@ -39,7 +39,7 @@ const Documentation = () => {
             </a>
 
             <a
-              href="https://github.com/your-org/ocx-protocol/tree/main/pkg"
+              href="https://github.com/KuroKernel/ocx-protocol/tree/main/pkg"
               target="_blank"
               rel="noopener noreferrer"
               className="border-2 border-gray-200 p-8 rounded hover:border-black transition-colors group"
@@ -50,7 +50,7 @@ const Documentation = () => {
             </a>
 
             <a
-              href="https://github.com/your-org/ocx-protocol/tree/main/libocx-verify"
+              href="https://github.com/KuroKernel/ocx-protocol/tree/main/libocx-verify"
               target="_blank"
               rel="noopener noreferrer"
               className="border-2 border-gray-200 p-8 rounded hover:border-black transition-colors group"
@@ -63,7 +63,7 @@ const Documentation = () => {
 
           <div className="bg-black text-green-400 p-6 rounded font-mono text-sm overflow-x-auto">
             <div className="text-gray-500"># Quick start</div>
-            <div>git clone https://github.com/your-org/ocx-protocol</div>
+            <div>git clone https://github.com/KuroKernel/ocx-protocol</div>
             <div>cd ocx-protocol</div>
             <div>OCX_API_KEY=test OCX_PORT=9001 ./demo/DEMO.sh</div>
           </div>

@@ -138,3 +138,6 @@ conformance/conformance-keys/*.key
 !keys/README.md
 !keys/.gitkeep
 !.env.example
+
+# Local Netlify folder
+.netlify

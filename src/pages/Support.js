@@ -27,7 +27,7 @@ const Support = () => {
             </a>
 
             <a
-              href="https://github.com/your-org/ocx-protocol/issues"
+              href="https://github.com/KuroKernel/ocx-protocol/issues"
               target="_blank"
               rel="noopener noreferrer"
               className="border-2 border-gray-200 p-8 rounded hover:border-black transition-colors group"
@@ -47,7 +47,7 @@ const Support = () => {
               <div>
                 <h3 className="font-medium text-black mb-2">How do I get started?</h3>
                 <p className="text-gray-700">
-                  Check the <a href="https://github.com/your-org/ocx-protocol#quick-start" className="underline">Quick Start</a> in
+                  Check the <a href="https://github.com/KuroKernel/ocx-protocol#quick-start" className="underline">Quick Start</a> in
                   the README. You can run the demo in under 5 minutes.
                 </p>
               </div>

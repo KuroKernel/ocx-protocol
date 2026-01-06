@@ -20,6 +20,14 @@ type ReceiptCore struct {
 	FloatMode   string   `cbor:"11,keyasint"` // Optional: "disabled", "soft", "hard"
 }
 
+// ChainableReceipt extends ReceiptCore with chaining fields for trust chains
+type ChainableReceipt struct {
+	ReceiptCore
+	PrevReceiptHash   *[32]byte `cbor:"12,keyasint,omitempty"` // Hash of previous receipt in chain
+	RequestDigest     *[32]byte `cbor:"13,keyasint,omitempty"` // Hash of original request for binding
+	WitnessSignatures [][]byte  `cbor:"14,keyasint,omitempty"` // Additional witness signatures
+}
+
 // ReceiptFull represents the complete receipt with signature and metadata
 type ReceiptFull struct {
 	Core       ReceiptCore       `cbor:"core"`

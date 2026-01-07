@@ -167,13 +167,80 @@ func (v *FPValidator) readVarUint32(reader *bytes.Reader) (uint32, error) {
 // checkFloatingPointOps checks for floating-point operations
 func (v *FPValidator) checkFloatingPointOps(module *WASMModule) error {
 	for _, section := range module.Sections {
-		if section.ID == 10 { // Code section
+		switch section.ID {
+		case 1: // Type section - check function signatures
+			if v.strictMode {
+				if err := v.checkTypeSection(section.Data); err != nil {
+					return err
+				}
+			}
+		case 10: // Code section
 			if err := v.checkCodeSection(section.Data); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// checkTypeSection checks type section for floating-point types in strict mode
+func (v *FPValidator) checkTypeSection(data []byte) error {
+	reader := bytes.NewReader(data)
+
+	// Read number of types
+	numTypes, err := v.readVarUint32(reader)
+	if err != nil {
+		return err
+	}
+
+	for i := uint32(0); i < numTypes; i++ {
+		// Read type form (should be 0x60 for func)
+		form, err := reader.ReadByte()
+		if err != nil {
+			return err
+		}
+		if form != 0x60 {
+			return fmt.Errorf("unexpected type form: 0x%02X", form)
+		}
+
+		// Read parameter types
+		numParams, err := v.readVarUint32(reader)
+		if err != nil {
+			return err
+		}
+		for j := uint32(0); j < numParams; j++ {
+			paramType, err := reader.ReadByte()
+			if err != nil {
+				return err
+			}
+			if v.isFloatValueType(paramType) {
+				return fmt.Errorf("%w: function type %d has float parameter", ErrFloatingPointDisallowed, i)
+			}
+		}
+
+		// Read return types
+		numResults, err := v.readVarUint32(reader)
+		if err != nil {
+			return err
+		}
+		for j := uint32(0); j < numResults; j++ {
+			resultType, err := reader.ReadByte()
+			if err != nil {
+				return err
+			}
+			if v.isFloatValueType(resultType) {
+				return fmt.Errorf("%w: function type %d has float return", ErrFloatingPointDisallowed, i)
+			}
+		}
+	}
+
+	return nil
+}
+
+// isFloatValueType returns true if the WASM value type is a float
+func (v *FPValidator) isFloatValueType(valType byte) bool {
+	// WASM value types: i32=0x7F, i64=0x7E, f32=0x7D, f64=0x7C
+	return valType == 0x7D || valType == 0x7C
 }
 
 // checkCodeSection checks a code section for floating-point operations
@@ -240,18 +307,18 @@ func (v *FPValidator) checkInstruction(reader *bytes.Reader) error {
 		return err
 	}
 
-	// Check for floating-point operations (simplified)
-	// Float32 operations (0x43-0x5f)
-	if opcode >= 0x43 && opcode <= 0x5f {
-		if !v.allowFloat32 {
-			return fmt.Errorf("float32 operations not allowed")
+	// In strict mode, reject ALL floating-point operations
+	if v.strictMode {
+		if v.isStrictFloatOpcode(opcode) {
+			return fmt.Errorf("%w: opcode 0x%02X", ErrFloatingPointDisallowed, opcode)
 		}
-	}
-
-	// Float64 operations (0x60-0x7f)
-	if opcode >= 0x60 && opcode <= 0x7f {
-		if !v.allowFloat64 {
-			return fmt.Errorf("float64 operations not allowed")
+	} else {
+		// Non-strict mode: check individual allowances
+		if v.isFloat32Opcode(opcode) && !v.allowFloat32 {
+			return fmt.Errorf("float32 operation not allowed: opcode 0x%02X", opcode)
+		}
+		if v.isFloat64Opcode(opcode) && !v.allowFloat64 {
+			return fmt.Errorf("float64 operation not allowed: opcode 0x%02X", opcode)
 		}
 	}
 
@@ -261,6 +328,74 @@ func (v *FPValidator) checkInstruction(reader *bytes.Reader) error {
 	}
 
 	return nil
+}
+
+// isStrictFloatOpcode returns true if opcode is ANY floating-point operation
+// Used in strict mode to reject ALL FP operations for determinism
+func (v *FPValidator) isStrictFloatOpcode(op byte) bool {
+	switch op {
+	// f32.const, f64.const
+	case 0x43, 0x44:
+		return true
+	// f32.load, f64.load, f32.store, f64.store
+	case 0x2A, 0x2B, 0x38, 0x39:
+		return true
+	// f32 comparison operations (0x5B-0x60)
+	case 0x5B, 0x5C, 0x5D, 0x5E, 0x5F, 0x60:
+		return true
+	// f64 comparison operations (0x61-0x66)
+	case 0x61, 0x62, 0x63, 0x64, 0x65, 0x66:
+		return true
+	// f32 arithmetic operations (0x8B-0x98)
+	case 0x8B, 0x8C, 0x8D, 0x8E, 0x8F,
+		0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98:
+		return true
+	// f64 arithmetic operations (0x99-0xA6)
+	case 0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F,
+		0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6:
+		return true
+	// i32/i64 to f32/f64 conversions (0xB2-0xBF)
+	case 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7, 0xB8, 0xB9,
+		0xBA, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF:
+		return true
+	// f32/f64 truncation to i32/i64 (0xA7-0xB1)
+	case 0xA7, 0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF,
+		0xB0, 0xB1:
+		return true
+	}
+	return false
+}
+
+// isFloat32Opcode returns true if opcode is a float32 operation
+func (v *FPValidator) isFloat32Opcode(op byte) bool {
+	switch op {
+	case 0x43, // f32.const
+		0x2A, 0x38, // f32.load, f32.store
+		0x5B, 0x5C, 0x5D, 0x5E, 0x5F, 0x60, // f32 comparisons
+		0x8B, 0x8C, 0x8D, 0x8E, 0x8F, // f32 abs/neg/ceil/floor/trunc
+		0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, // f32 ops
+		0xB2, 0xB3, 0xB4, 0xB5, // i32/i64 -> f32 conversions
+		0xA8, 0xA9, // f32 -> i32/i64 truncations
+		0xB6, 0xBE: // f64 -> f32, reinterpret
+		return true
+	}
+	return false
+}
+
+// isFloat64Opcode returns true if opcode is a float64 operation
+func (v *FPValidator) isFloat64Opcode(op byte) bool {
+	switch op {
+	case 0x44, // f64.const
+		0x2B, 0x39, // f64.load, f64.store
+		0x61, 0x62, 0x63, 0x64, 0x65, 0x66, // f64 comparisons
+		0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F, // f64 abs/neg/ceil/floor/trunc/nearest/sqrt
+		0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, // f64 add/sub/mul/div/min/max/copysign
+		0xB7, 0xB8, 0xB9, 0xBA, 0xBB, // i32/i64 -> f64 conversions
+		0xAA, 0xAB, 0xAC, 0xAD, 0xAE, 0xAF, // f64 -> i32/i64 truncations
+		0xBC, 0xBF: // f32 -> f64, reinterpret
+		return true
+	}
+	return false
 }
 
 // skipInstructionOperands skips instruction operands

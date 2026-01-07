@@ -51,19 +51,27 @@ func SetFuelMeteredWASMType(fuelLimit uint64) error {
 }
 
 // applyCgroups applies cgroups v2 resource limits for deterministic execution
+// In strict mode, cgroup failures cause execution to fail
 func applyCgroups(config VMConfig, pid int) (*CgroupManager, error) {
+	strictMode := config.StrictMode
+
 	// Only on Linux
 	if runtime.GOOS != "linux" {
-		return nil, nil // Graceful degradation
+		if strictMode {
+			return nil, fmt.Errorf("cgroups required but not available on %s", runtime.GOOS)
+		}
+		return nil, nil // Graceful degradation in permissive mode
 	}
 
 	// Try to create cgroup
 	cgManager, err := NewCgroupManager(fmt.Sprintf("vm-%d", pid))
 	if err != nil {
+		if strictMode {
+			return nil, fmt.Errorf("cgroups required but creation failed: %w", err)
+		}
 		// Log warning to stderr to avoid breaking stdout determinism
-		// Only log once to avoid spam
 		if !strings.Contains(err.Error(), "permission denied") {
-			fmt.Fprintf(os.Stderr, "⚠ Cgroups unavailable: %v\n", err)
+			fmt.Fprintf(os.Stderr, "⚠ Cgroups unavailable (permissive mode): %v\n", err)
 		}
 		return nil, nil
 	}
@@ -76,8 +84,11 @@ func applyCgroups(config VMConfig, pid int) (*CgroupManager, error) {
 	}
 
 	if err := cgManager.Apply(pid, limits); err != nil {
-		fmt.Printf("⚠ Failed to apply cgroup limits: %v\n", err)
 		cgManager.Cleanup()
+		if strictMode {
+			return nil, fmt.Errorf("cgroup limits application failed: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "⚠ Failed to apply cgroup limits (permissive mode): %v\n", err)
 		return nil, nil
 	}
 
@@ -97,15 +108,31 @@ func applySeccomp(workingDir string, strictMode bool) error {
 }
 
 // installSeccomp installs seccomp filter for the current process
+// Respects OCX_STRICT_MODE environment variable (default: true in production)
 func installSeccomp() error {
+	return installSeccompWithMode(isStrictModeEnabled(), "/tmp")
+}
+
+// installSeccompWithMode installs seccomp with explicit strict mode setting
+func installSeccompWithMode(strictMode bool, workingDir string) error {
 	ctx := context.Background()
 	config := SeccompConfig{
-		StrictSandbox: false,  // Non-strict mode for VM processes
-		WorkingDir:    "/tmp", // Default working directory
+		StrictSandbox: strictMode,
+		WorkingDir:    workingDir,
 		Logger:        log.New(os.Stderr, "[seccomp] ", log.LstdFlags),
 	}
 
 	return ApplySeccompProfile(ctx, config)
+}
+
+// isStrictModeEnabled checks if strict security mode is enabled
+// Defaults to true unless OCX_STRICT_MODE=false
+func isStrictModeEnabled() bool {
+	val := os.Getenv("OCX_STRICT_MODE")
+	if val == "" {
+		return true // Default to strict in production
+	}
+	return val != "false" && val != "0" && val != "no"
 }
 
 // GetVM returns the current VM implementation.
@@ -159,13 +186,23 @@ func (v *OSProcessVM) Run(ctx context.Context, config VMConfig) (*ExecutionResul
 	pid := cmd.Process.Pid
 
 	// Apply cgroups after process starts
-	cgManager, err := applyCgroups(config, pid)
+	// In strict mode, cgroup failure will terminate execution
+	cgManager, cgErr := applyCgroups(config, pid)
+	if cgErr != nil {
+		// Kill the process since we can't properly sandbox it
+		cmd.Process.Kill()
+		return nil, &ExecutionError{
+			Code:       ErrorCodeEnvironmentSetup,
+			Message:    "Failed to apply cgroup isolation",
+			Underlying: cgErr,
+		}
+	}
 	if cgManager != nil {
 		defer cgManager.Cleanup()
 	}
 
 	// Wait for completion
-	err = cmd.Wait()
+	err := cmd.Wait()
 	endTime := time.Now()
 	duration := endTime.Sub(startTime)
 
@@ -181,7 +218,7 @@ func (v *OSProcessVM) Run(ctx context.Context, config VMConfig) (*ExecutionResul
 				ExitCode:   exitError.ExitCode(),
 				Stdout:     stdout.Bytes(),
 				Stderr:     stderr.Bytes(),
-				GasUsed:    calculateDeterministicGas(cyclesUsed, len(stdout.Bytes()), len(stderr.Bytes())),
+				GasUsed:    calculateScriptGasFromPath(config.ArtifactPath, config.InputData, len(stdout.Bytes()), len(stderr.Bytes())),
 				HostCycles: cyclesUsed,
 				MemoryUsed: memoryUsed,
 				Duration:   duration,
@@ -238,7 +275,7 @@ func (v *OSProcessVM) Run(ctx context.Context, config VMConfig) (*ExecutionResul
 		ExitCode:   0,
 		Stdout:     stdout.Bytes(),
 		Stderr:     stderr.Bytes(),
-		GasUsed:    calculateDeterministicGas(cyclesUsed, len(stdout.Bytes()), len(stderr.Bytes())),
+		GasUsed:    calculateScriptGasFromPath(config.ArtifactPath, config.InputData, len(stdout.Bytes()), len(stderr.Bytes())),
 		HostCycles: cyclesUsed,
 		MemoryUsed: memoryUsed,
 		Duration:   duration,
@@ -250,23 +287,35 @@ func (v *OSProcessVM) Run(ctx context.Context, config VMConfig) (*ExecutionResul
 	}, nil
 }
 
-// calculateDeterministicGas computes a deterministic gas value based on execution metrics.
-// This provides a consistent "logical time" that doesn't depend on wall-clock timing.
-func calculateDeterministicGas(cycles uint64, stdoutLen, stderrLen int) uint64 {
-	// Base gas from cycles (primary deterministic metric)
-	baseGas := cycles / 1000 // Scale down for reasonable gas units
-
-	// Add gas for I/O operations (deterministic based on output size)
-	ioGas := uint64(stdoutLen + stderrLen) // 1 gas per byte of output
-
-	// Minimum gas to ensure non-zero values for successful executions
-	const minGas = 100
-
-	totalGas := baseGas + ioGas
-	if totalGas < minGas {
-		totalGas = minGas
+// calculateScriptGasFromPath reads the script and calculates deterministic gas
+// This is purely based on script content, not execution time
+func calculateScriptGasFromPath(artifactPath string, inputData []byte, stdoutLen, stderrLen int) uint64 {
+	// Read script content
+	scriptBytes, err := os.ReadFile(artifactPath)
+	if err != nil {
+		// Fallback to output-based gas if we can't read the script
+		return uint64(100 + stdoutLen + stderrLen)
 	}
 
+	script := string(scriptBytes)
+
+	// Use the deterministic gas calculation from gas.go
+	baseGas := CalculateDeterministicGas(script, inputData)
+
+	// Add I/O cost (deterministic based on output size)
+	ioGas := uint64(stdoutLen + stderrLen)
+
+	return baseGas + ioGas
+}
+
+// calculateDeterministicGas is kept for backward compatibility
+// DEPRECATED: Use calculateScriptGasFromPath for proper deterministic gas
+func calculateDeterministicGas(cycles uint64, stdoutLen, stderrLen int) uint64 {
+	// This function is deprecated but kept for compatibility
+	// It now ignores cycles and uses output-based calculation
+	const minGas = 100
+	ioGas := uint64(stdoutLen + stderrLen)
+	totalGas := minGas + ioGas
 	return totalGas
 }
 
@@ -285,12 +334,23 @@ func (v *OSProcessVM) configureIsolation(cmd *exec.Cmd) error {
 
 // configureLinuxIsolation sets up Linux-specific isolation using namespaces, seccomp, and cgroups.
 func (v *OSProcessVM) configureLinuxIsolation(cmd *exec.Cmd) error {
-	// Configure basic isolation (namespaces disabled for testing compatibility)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		// Set process group for easier cleanup
-		Setpgid: true,
-		// Note: Namespaces disabled for testing - enable in production
-		// Cloneflags: syscall.CLONE_NEWPID | syscall.CLONE_NEWNET | syscall.CLONE_NEWUTS,
+	strictMode := isStrictModeEnabled()
+
+	if strictMode {
+		// Full namespace isolation in strict/production mode
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Setpgid: true,
+			// Enable namespace isolation for security
+			Cloneflags: syscall.CLONE_NEWPID | // New PID namespace
+				syscall.CLONE_NEWNET | // New network namespace (no network access)
+				syscall.CLONE_NEWUTS | // New UTS namespace (hostname isolation)
+				syscall.CLONE_NEWIPC, // New IPC namespace (shared memory isolation)
+		}
+	} else {
+		// Basic isolation in permissive/development mode
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Setpgid: true,
+		}
 	}
 
 	return nil

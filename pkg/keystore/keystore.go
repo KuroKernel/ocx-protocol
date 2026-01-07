@@ -20,7 +20,8 @@ type KeyMetadata struct {
 	ID        string    `json:"id"`
 	PublicKey string    `json:"public_key"`
 	CreatedAt time.Time `json:"created_at"`
-	Status    string    `json:"status"` // "active" or "revoked"
+	Status    string    `json:"status"`  // "active" or "revoked"
+	Version   uint32    `json:"version"` // Key version for rotation tracking
 }
 
 // Signer interface for cryptographic signing
@@ -78,6 +79,15 @@ func (ks *Keystore) GenerateKey() error {
 
 	keyID := hex.EncodeToString(publicKey[:8]) // First 8 bytes as ID
 
+	// Calculate next version by finding highest existing version
+	var maxVersion uint32
+	for _, k := range ks.activeKeys {
+		if k.Metadata.Version > maxVersion {
+			maxVersion = k.Metadata.Version
+		}
+	}
+	nextVersion := maxVersion + 1
+
 	key := &Key{
 		ID:         keyID,
 		PublicKey:  publicKey,
@@ -87,6 +97,7 @@ func (ks *Keystore) GenerateKey() error {
 			PublicKey: hex.EncodeToString(publicKey),
 			CreatedAt: time.Now().UTC(),
 			Status:    "active",
+			Version:   nextVersion,
 		},
 	}
 

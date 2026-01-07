@@ -11,6 +11,10 @@ type ReceiptFields struct {
 	StartedAt   uint64            `json:"started_at"`
 	FinishedAt  uint64            `json:"finished_at"`
 	IssuerID    string            `json:"issuer_id"`
+	KeyVersion  uint32            `json:"key_version"`
+	Nonce       []byte            `json:"nonce"`
+	IssuedAt    uint64            `json:"issued_at"`
+	FloatMode   string            `json:"float_mode"`
 	Signature   []byte            `json:"signature"`
 	HostCycles  uint64            `json:"host_cycles"`
 	HostInfo    map[string]string `json:"host_info"`

@@ -503,14 +503,27 @@ func (s *Server) handleExecute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. GENERATE RECEIPT CORE: Build the signed core from the result
-	receiptCore := &receipt.ReceiptCore{
-		ProgramHash: artifactHash,
-		InputHash:   sha256.Sum256(input),
-		OutputHash:  sha256.Sum256(result.Stdout), // Use stdout as the primary output
-		GasUsed:     result.GasUsed,
-		StartedAt:   uint64(startedAt.Unix()),
-		FinishedAt:  uint64(result.EndTime.Unix()),
-		IssuerID:    "ocx-server-v1",
+	// Use NewReceiptCore to ensure nonce and all security fields are properly set
+	activeKey := s.keystore.GetActiveKey()
+	if activeKey == nil {
+		s.sendError(w, "No active signing key available", http.StatusInternalServerError)
+		return
+	}
+
+	receiptCore, err := receipt.NewReceiptCore(
+		artifactHash,
+		sha256.Sum256(input),
+		sha256.Sum256(result.Stdout), // Use stdout as the primary output
+		result.GasUsed,
+		startedAt,
+		result.EndTime,
+		"ocx-server-v1",
+		activeKey.Metadata.Version, // Use key version for rotation support
+		"disabled",        // Float mode - disabled for determinism
+	)
+	if err != nil {
+		s.sendError(w, fmt.Sprintf("Failed to create receipt core: %v", err), http.StatusInternalServerError)
+		return
 	}
 
 	// 4. CANONICALIZE AND SIGN RECEIPT CORE
@@ -521,12 +534,7 @@ func (s *Server) handleExecute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Sign the canonical bytes with real Ed25519 signature
-	activeKey := s.keystore.GetActiveKey()
-	if activeKey == nil {
-		s.sendError(w, "No active signing key available", http.StatusInternalServerError)
-		return
-	}
-
+	// activeKey was already fetched above for key version
 	signature, pubKey, err := s.signer.Sign(r.Context(), activeKey.ID, coreBytes)
 	if err != nil {
 		s.sendError(w, fmt.Sprintf("Failed to sign receipt: %v", err), http.StatusInternalServerError)

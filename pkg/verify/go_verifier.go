@@ -69,6 +69,10 @@ func (gv *GoVerifier) ExtractReceiptFields(receiptData []byte) (*ReceiptFields, 
 		StartedAt:   receiptFull.Core.StartedAt,
 		FinishedAt:  receiptFull.Core.FinishedAt,
 		IssuerID:    receiptFull.Core.IssuerID,
+		KeyVersion:  receiptFull.Core.KeyVersion,
+		Nonce:       receiptFull.Core.Nonce[:],
+		IssuedAt:    receiptFull.Core.IssuedAt,
+		FloatMode:   receiptFull.Core.FloatMode,
 		Signature:   receiptFull.Signature,
 		HostCycles:  receiptFull.HostCycles,
 		HostInfo:    receiptFull.HostInfo,
@@ -164,6 +168,27 @@ func (gv *GoVerifier) validateInvariants(core *receipt.ReceiptCore) error {
 	// Validate issuer ID
 	if core.IssuerID == "" {
 		return fmt.Errorf("issuer_id must not be empty")
+	}
+
+	// Validate nonce is present (16 bytes, not all zeros)
+	var zeroNonce [16]byte
+	if core.Nonce == zeroNonce {
+		return fmt.Errorf("nonce must not be zero - replay protection requires unique nonce")
+	}
+
+	// Validate IssuedAt is reasonable (not zero, not in future)
+	if core.IssuedAt == 0 {
+		return fmt.Errorf("issued_at must be set")
+	}
+	// IssuedAt should be after FinishedAt (receipt issued after execution)
+	if core.IssuedAt < core.FinishedAt {
+		return fmt.Errorf("issued_at (%d) must be >= finished_at (%d)", core.IssuedAt, core.FinishedAt)
+	}
+
+	// Validate FloatMode is valid
+	validFloatModes := map[string]bool{"disabled": true, "soft": true, "hard": true}
+	if core.FloatMode != "" && !validFloatModes[core.FloatMode] {
+		return fmt.Errorf("invalid float_mode: %s (must be disabled, soft, or hard)", core.FloatMode)
 	}
 
 	return nil

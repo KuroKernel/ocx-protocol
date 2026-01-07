@@ -205,14 +205,20 @@ func TestKMSManager(t *testing.T) {
 	keyID := "test-key"
 	version := uint32(1)
 
+	// Get provider
+	provider, err := kms.GetProvider("local")
+	if err != nil {
+		t.Fatalf("Failed to get provider: %v", err)
+	}
+
 	// Generate key
-	keyPair, err := kms.GetProvider("local").GenerateKey(ctx, keyID, version)
+	_, err = provider.GenerateKey(ctx, keyID, version)
 	if err != nil {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
 
 	// Get public key
-	publicKey, err := kms.GetProvider("local").GetPublicKey(ctx, keyID, version)
+	publicKey, err := provider.GetPublicKey(ctx, keyID, version)
 	if err != nil {
 		t.Fatalf("Failed to get public key: %v", err)
 	}
@@ -223,19 +229,19 @@ func TestKMSManager(t *testing.T) {
 
 	// Test signing
 	data := []byte("test data")
-	signature, err := kms.GetProvider("local").Sign(ctx, keyID, version, data)
+	signature, err := provider.Sign(ctx, keyID, version, data)
 	if err != nil {
 		t.Fatalf("Failed to sign data: %v", err)
 	}
 
 	// Test verification
-	err = kms.GetProvider("local").Verify(ctx, keyID, version, data, signature)
+	err = provider.Verify(ctx, keyID, version, data, signature)
 	if err != nil {
 		t.Fatalf("Failed to verify signature: %v", err)
 	}
 
 	// List keys
-	keys, err := kms.GetProvider("local").ListKeys(ctx)
+	keys, err := provider.ListKeys(ctx)
 	if err != nil {
 		t.Fatalf("Failed to list keys: %v", err)
 	}

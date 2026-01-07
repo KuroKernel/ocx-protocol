@@ -5,10 +5,18 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"testing"
+	"time"
 
 	"ocx.local/pkg/keystore"
 	"ocx.local/pkg/receipt"
 )
+
+// generateNonce creates a random 16-byte nonce for testing
+func generateNonce() [16]byte {
+	var nonce [16]byte
+	rand.Read(nonce[:])
+	return nonce
+}
 
 func TestGoVerifierVerifyReceipt(t *testing.T) {
 	// Create test keystore and signer
@@ -32,14 +40,19 @@ func TestGoVerifierVerifyReceipt(t *testing.T) {
 	ctx := context.Background()
 
 	// Create test receipt core
+	now := uint64(time.Now().UnixNano())
 	receiptCore := receipt.ReceiptCore{
 		ProgramHash: [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32},
 		InputHash:   [32]byte{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33},
 		OutputHash:  [32]byte{3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34},
 		GasUsed:     1000,
-		StartedAt:   1640995200,
-		FinishedAt:  1640995201,
+		StartedAt:   now - 1000000,
+		FinishedAt:  now - 500000,
 		IssuerID:    "test-issuer",
+		KeyVersion:  1,
+		Nonce:       generateNonce(),
+		IssuedAt:    now,
+		FloatMode:   "disabled",
 	}
 
 	// Canonicalize and sign the receipt core
@@ -130,14 +143,19 @@ func TestGoVerifierVerifyReceipt(t *testing.T) {
 
 func TestGoVerifierExtractReceiptFields(t *testing.T) {
 	// Create test receipt
+	now := uint64(time.Now().UnixNano())
 	receiptCore := receipt.ReceiptCore{
 		ProgramHash: [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32},
 		InputHash:   [32]byte{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33},
 		OutputHash:  [32]byte{3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34},
 		GasUsed:     1000,
-		StartedAt:   1640995200,
-		FinishedAt:  1640995201,
+		StartedAt:   now - 1000000,
+		FinishedAt:  now - 500000,
 		IssuerID:    "test-issuer",
+		KeyVersion:  1,
+		Nonce:       generateNonce(),
+		IssuedAt:    now,
+		FloatMode:   "disabled",
 	}
 
 	receiptFull := receipt.ReceiptFull{
@@ -254,6 +272,7 @@ func TestGoVerifierBatchVerify(t *testing.T) {
 	numReceipts := 5
 	receipts := make([][]byte, numReceipts)
 	publicKeys := make([]ed25519.PublicKey, numReceipts)
+	now := uint64(time.Now().UnixNano())
 
 	for i := 0; i < numReceipts; i++ {
 		receiptCore := receipt.ReceiptCore{
@@ -261,9 +280,13 @@ func TestGoVerifierBatchVerify(t *testing.T) {
 			InputHash:   [32]byte{byte(i), 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33},
 			OutputHash:  [32]byte{byte(i), 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34},
 			GasUsed:     uint64(1000 + i),
-			StartedAt:   1640995200 + uint64(i),
-			FinishedAt:  1640995201 + uint64(i),
+			StartedAt:   now - 1000000 + uint64(i),
+			FinishedAt:  now - 500000 + uint64(i),
 			IssuerID:    "test-issuer",
+			KeyVersion:  1,
+			Nonce:       generateNonce(),
+			IssuedAt:    now + uint64(i),
+			FloatMode:   "disabled",
 		}
 
 		// Canonicalize and sign
@@ -401,6 +424,7 @@ func TestGoVerifierGetVersion(t *testing.T) {
 
 func TestGoVerifierEdgeCases(t *testing.T) {
 	verifier := NewGoVerifier()
+	now := uint64(time.Now().UnixNano())
 
 	t.Run("verify_receipt_with_invalid_signature_length", func(t *testing.T) {
 		// Create a receipt with invalid signature length
@@ -409,9 +433,13 @@ func TestGoVerifierEdgeCases(t *testing.T) {
 			InputHash:   [32]byte{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33},
 			OutputHash:  [32]byte{3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34},
 			GasUsed:     1000,
-			StartedAt:   1640995200,
-			FinishedAt:  1640995201,
+			StartedAt:   now - 1000000,
+			FinishedAt:  now - 500000,
 			IssuerID:    "test-issuer",
+			KeyVersion:  1,
+			Nonce:       generateNonce(),
+			IssuedAt:    now,
+			FloatMode:   "disabled",
 		}
 
 		receiptFull := receipt.ReceiptFull{
@@ -444,9 +472,13 @@ func TestGoVerifierEdgeCases(t *testing.T) {
 			InputHash:   [32]byte{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33},
 			OutputHash:  [32]byte{3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34},
 			GasUsed:     0, // Zero gas
-			StartedAt:   1640995200,
-			FinishedAt:  1640995201,
+			StartedAt:   now - 1000000,
+			FinishedAt:  now - 500000,
 			IssuerID:    "test-issuer",
+			KeyVersion:  1,
+			Nonce:       generateNonce(),
+			IssuedAt:    now,
+			FloatMode:   "disabled",
 		}
 
 		receiptFull := receipt.ReceiptFull{
@@ -480,9 +512,13 @@ func TestGoVerifierEdgeCases(t *testing.T) {
 			InputHash:   [32]byte{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33},
 			OutputHash:  [32]byte{3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34},
 			GasUsed:     1000,
-			StartedAt:   1640995201, // Started after finished
-			FinishedAt:  1640995200,
+			StartedAt:   now - 500000, // Started after finished
+			FinishedAt:  now - 1000000,
 			IssuerID:    "test-issuer",
+			KeyVersion:  1,
+			Nonce:       generateNonce(),
+			IssuedAt:    now,
+			FloatMode:   "disabled",
 		}
 
 		receiptFull := receipt.ReceiptFull{
@@ -532,14 +568,19 @@ func TestGoVerifierConcurrency(t *testing.T) {
 	ctx := context.Background()
 
 	// Create test receipt
+	now := uint64(time.Now().UnixNano())
 	receiptCore := receipt.ReceiptCore{
 		ProgramHash: [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32},
 		InputHash:   [32]byte{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33},
 		OutputHash:  [32]byte{3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34},
 		GasUsed:     1000,
-		StartedAt:   1640995200,
-		FinishedAt:  1640995201,
+		StartedAt:   now - 1000000,
+		FinishedAt:  now - 500000,
 		IssuerID:    "test-issuer",
+		KeyVersion:  1,
+		Nonce:       generateNonce(),
+		IssuedAt:    now,
+		FloatMode:   "disabled",
 	}
 
 	coreBytes, err := receipt.CanonicalizeCore(&receiptCore)
@@ -623,14 +664,19 @@ func BenchmarkGoVerifierVerifyReceipt(b *testing.B) {
 	ctx := context.Background()
 
 	// Create test receipt
+	now := uint64(time.Now().UnixNano())
 	receiptCore := receipt.ReceiptCore{
 		ProgramHash: [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32},
 		InputHash:   [32]byte{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33},
 		OutputHash:  [32]byte{3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34},
 		GasUsed:     1000,
-		StartedAt:   1640995200,
-		FinishedAt:  1640995201,
+		StartedAt:   now - 1000000,
+		FinishedAt:  now - 500000,
 		IssuerID:    "test-issuer",
+		KeyVersion:  1,
+		Nonce:       generateNonce(),
+		IssuedAt:    now,
+		FloatMode:   "disabled",
 	}
 
 	coreBytes, err := receipt.CanonicalizeCore(&receiptCore)
@@ -669,14 +715,19 @@ func BenchmarkGoVerifierVerifyReceipt(b *testing.B) {
 
 func BenchmarkGoVerifierExtractReceiptFields(b *testing.B) {
 	// Create test receipt
+	now := uint64(time.Now().UnixNano())
 	receiptCore := receipt.ReceiptCore{
 		ProgramHash: [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32},
 		InputHash:   [32]byte{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33},
 		OutputHash:  [32]byte{3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34},
 		GasUsed:     1000,
-		StartedAt:   1640995200,
-		FinishedAt:  1640995201,
+		StartedAt:   now - 1000000,
+		FinishedAt:  now - 500000,
 		IssuerID:    "test-issuer",
+		KeyVersion:  1,
+		Nonce:       generateNonce(),
+		IssuedAt:    now,
+		FloatMode:   "disabled",
 	}
 
 	receiptFull := receipt.ReceiptFull{
@@ -727,6 +778,7 @@ func BenchmarkGoVerifierBatchVerify(b *testing.B) {
 	numReceipts := 10
 	receipts := make([][]byte, numReceipts)
 	publicKeys := make([]ed25519.PublicKey, numReceipts)
+	now := uint64(time.Now().UnixNano())
 
 	for i := 0; i < numReceipts; i++ {
 		receiptCore := receipt.ReceiptCore{
@@ -734,9 +786,13 @@ func BenchmarkGoVerifierBatchVerify(b *testing.B) {
 			InputHash:   [32]byte{byte(i), 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33},
 			OutputHash:  [32]byte{byte(i), 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34},
 			GasUsed:     uint64(1000 + i),
-			StartedAt:   1640995200 + uint64(i),
-			FinishedAt:  1640995201 + uint64(i),
+			StartedAt:   now - 1000000 + uint64(i),
+			FinishedAt:  now - 500000 + uint64(i),
 			IssuerID:    "test-issuer",
+			KeyVersion:  1,
+			Nonce:       generateNonce(),
+			IssuedAt:    now + uint64(i),
+			FloatMode:   "disabled",
 		}
 
 		coreBytes, err := receipt.CanonicalizeCore(&receiptCore)

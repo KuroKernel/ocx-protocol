@@ -2,7 +2,7 @@ module ocx.local
 
 go 1.24.0
 
-toolchain go1.24.7
+toolchain go1.24.11
 
 require (
 	github.com/fxamacker/cbor/v2 v2.4.0
@@ -16,7 +16,7 @@ require (
 	github.com/swaggo/http-swagger v1.3.4
 	github.com/tetratelabs/wazero v1.3.0
 	go.uber.org/atomic v1.11.0
-	golang.org/x/time v0.13.0
+	golang.org/x/time v0.5.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

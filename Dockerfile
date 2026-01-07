@@ -1,8 +1,8 @@
 # Multi-stage build for OCX Protocol
 FROM golang:1.24-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache git make
+# Install build dependencies (including CGO dependencies for sqlite3)
+RUN apk add --no-cache git make gcc musl-dev
 
 # Set working directory
 WORKDIR /app
@@ -14,8 +14,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application
-RUN make build
+# Build the server application
+RUN CGO_ENABLED=1 go build -ldflags="-w -s" -o server ./cmd/server
 
 # Runtime stage
 FROM alpine:latest
@@ -29,10 +29,8 @@ RUN adduser -D -s /bin/sh ocx
 # Set working directory
 WORKDIR /app
 
-# Copy binaries from builder
-COPY --from=builder /app/ocx /app/ocx
+# Copy binary from builder
 COPY --from=builder /app/server /app/server
-COPY --from=builder /app/verify-standalone /app/verify-standalone
 
 # Copy database schema
 COPY --from=builder /app/database/migrations /app/database/migrations

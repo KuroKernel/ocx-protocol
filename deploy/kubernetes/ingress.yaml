@@ -1,0 +1,140 @@
+# OCX Protocol Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ocx-ingress
+  namespace: ocx-protocol
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-burst-multiplier: "2"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # CORS headers
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://kitaab.app,https://app.kitaab.app"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-Request-ID"
+spec:
+  tls:
+    - hosts:
+        - ocx.kitaab.app
+        - api.ocx.kitaab.app
+      secretName: ocx-tls-secret
+  rules:
+    # Main API
+    - host: api.ocx.kitaab.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ocx-server
+                port:
+                  number: 8080
+          - path: /v1
+            pathType: Prefix
+            backend:
+              service:
+                name: ocx-server
+                port:
+                  number: 8080
+    # gRPC endpoint
+    - host: grpc.ocx.kitaab.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ocx-server
+                port:
+                  number: 50051
+---
+# Certificate (for cert-manager)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ocx-tls
+  namespace: ocx-protocol
+spec:
+  secretName: ocx-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - ocx.kitaab.app
+    - api.ocx.kitaab.app
+    - grpc.ocx.kitaab.app
+---
+# Redis Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocx-redis
+  namespace: ocx-protocol
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ocx-redis
+  template:
+    metadata:
+      labels:
+        app: ocx-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          command:
+            - redis-server
+            - --appendonly
+            - "yes"
+            - --maxmemory
+            - "512mb"
+            - --maxmemory-policy
+            - allkeys-lru
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ocx-redis
+  namespace: ocx-protocol
+spec:
+  ports:
+    - port: 6379
+      targetPort: 6379
+  selector:
+    app: ocx-redis
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: ocx-protocol
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

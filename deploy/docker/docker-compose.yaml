@@ -1,0 +1,193 @@
+# OCX Protocol - Docker Compose
+# Production-ready deployment with all services
+
+version: '3.8'
+
+services:
+  # ==========================================
+  # OCX API Server
+  # ==========================================
+  ocx-server:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    image: ocx-protocol/server:latest
+    container_name: ocx-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"   # HTTP API
+      - "9090:9090"   # Metrics
+      - "50051:50051" # gRPC
+    environment:
+      - OCX_ENV=production
+      - OCX_STRICT_MODE=true
+      - OCX_DB_PATH=/app/data/ocx.db
+      - OCX_BADGER_PATH=/app/data/badger
+      - OCX_LOG_LEVEL=info
+      - OCX_METRICS_ENABLED=true
+      - OCX_WORKERS=4
+      - OCX_REDIS_URL=redis://redis:6379
+    volumes:
+      - ocx-data:/app/data
+      - ocx-logs:/app/logs
+    depends_on:
+      - redis
+    networks:
+      - ocx-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ==========================================
+  # OCX Background Worker
+  # ==========================================
+  ocx-worker:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    image: ocx-protocol/server:latest
+    container_name: ocx-worker
+    command: ["/app/bin/ocx-worker"]
+    restart: unless-stopped
+    environment:
+      - OCX_ENV=production
+      - OCX_WORKER_MODE=true
+      - OCX_DB_PATH=/app/data/ocx.db
+      - OCX_BADGER_PATH=/app/data/badger
+      - OCX_REDIS_URL=redis://redis:6379
+      - OCX_BATCH_SIZE=100
+      - OCX_VERIFY_WORKERS=8
+    volumes:
+      - ocx-data:/app/data
+      - ocx-logs:/app/logs
+    depends_on:
+      - redis
+      - ocx-server
+    networks:
+      - ocx-network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  # ==========================================
+  # Redis (for queues and caching)
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: ocx-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - ocx-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # Prometheus (Metrics)
+  # ==========================================
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: ocx-prometheus
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    networks:
+      - ocx-network
+    depends_on:
+      - ocx-server
+
+  # ==========================================
+  # Grafana (Dashboards)
+  # ==========================================
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: ocx-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-ocx-admin-2024}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/grafana
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - ocx-network
+    depends_on:
+      - prometheus
+
+  # ==========================================
+  # Nginx (Reverse Proxy)
+  # ==========================================
+  nginx:
+    image: nginx:alpine
+    container_name: ocx-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - ocx-network
+    depends_on:
+      - ocx-server
+      - grafana
+
+# ==========================================
+# Networks
+# ==========================================
+networks:
+  ocx-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+
+# ==========================================
+# Volumes
+# ==========================================
+volumes:
+  ocx-data:
+    driver: local
+  ocx-logs:
+    driver: local
+  redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local

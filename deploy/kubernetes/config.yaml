@@ -1,0 +1,112 @@
+# OCX Protocol ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ocx-config
+  namespace: ocx-protocol
+  labels:
+    app.kubernetes.io/name: ocx-protocol
+data:
+  server.yaml: |
+    server:
+      port: 8080
+      metrics_port: 9090
+      grpc_port: 50051
+      read_timeout: 30s
+      write_timeout: 30s
+      shutdown_timeout: 30s
+
+    logging:
+      level: info
+      format: json
+      output: stdout
+
+    database:
+      driver: badger
+      path: /app/data/badger
+      sync_writes: true
+      gc_interval: 10m
+
+    verification:
+      workers: 4
+      batch_size: 100
+      timeout: 30s
+      strict_mode: true
+
+    replay_protection:
+      retention: 24h
+      clock_skew: 5m
+      cleanup_interval: 1h
+
+    compression:
+      enabled: true
+      level: default
+
+    merkle:
+      hash_algorithm: sha256
+      cache_size: 10000
+
+    rate_limiting:
+      enabled: true
+      requests_per_second: 1000
+      burst: 2000
+
+    cors:
+      enabled: true
+      allowed_origins:
+        - "https://kitaab.app"
+        - "https://app.kitaab.app"
+      allowed_methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      allowed_headers:
+        - Authorization
+        - Content-Type
+        - X-Request-ID
+      max_age: 86400
+
+  worker.yaml: |
+    worker:
+      concurrency: 8
+      batch_size: 100
+      poll_interval: 100ms
+      max_retries: 3
+      retry_backoff: 1s
+
+    queue:
+      driver: redis
+      prefix: ocx:queue:
+      visibility_timeout: 30s
+
+    verification:
+      parallel: true
+      workers: 8
+---
+# Secrets Template (apply with proper values)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ocx-secrets
+  namespace: ocx-protocol
+type: Opaque
+stringData:
+  redis-url: "redis://ocx-redis:6379"
+  signing-key: "REPLACE_WITH_ACTUAL_ED25519_PRIVATE_KEY"
+  api-key: "REPLACE_WITH_API_KEY"
+---
+# PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ocx-data-pvc
+  namespace: ocx-protocol
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 50Gi

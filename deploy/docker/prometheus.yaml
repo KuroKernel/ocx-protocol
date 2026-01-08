@@ -1,0 +1,54 @@
+# Prometheus configuration for OCX Protocol
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'ocx-production'
+    env: 'production'
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Rule files
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+# Scrape configurations
+scrape_configs:
+  # OCX Server metrics
+  - job_name: 'ocx-server'
+    static_configs:
+      - targets: ['ocx-server:9090']
+    metrics_path: /metrics
+    scrape_interval: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+):\d+'
+        replacement: '${1}'
+
+  # OCX Worker metrics
+  - job_name: 'ocx-worker'
+    static_configs:
+      - targets: ['ocx-worker:9090']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Redis metrics (via redis_exporter if deployed)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node metrics (if node_exporter deployed)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']

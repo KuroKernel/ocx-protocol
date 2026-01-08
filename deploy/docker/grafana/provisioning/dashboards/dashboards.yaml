@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'OCX Protocol'
+    orgId: 1
+    folder: 'OCX'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

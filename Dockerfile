@@ -12,17 +12,15 @@ RUN apk add --no-cache git ca-certificates tzdata
 # Set working directory
 WORKDIR /build
 
-# Copy go mod files first for caching
-COPY go.mod go.sum ./
-
-# Downgrade x/time to version compatible with Go 1.23
-RUN go mod edit -require golang.org/x/time@v0.5.0 && go mod download
-
-# Copy source code
+# Copy all source code
 COPY . .
 
-# Build server binary (CGO_ENABLED=0 for static binary)
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /build/bin/ocx-server ./cmd/server
+# Downgrade Go version and x/time to be compatible with Go 1.23, then build
+RUN go mod edit -go=1.23 -require golang.org/x/time@v0.5.0 && \
+    sed -i '/^toolchain/d' go.mod && \
+    go mod tidy && \
+    go mod download && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /build/bin/ocx-server ./cmd/server
 
 # ============================================
 # Stage 2: Runtime

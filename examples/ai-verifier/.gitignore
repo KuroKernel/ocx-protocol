@@ -1,0 +1,6 @@
+venv/
+models/
+*.gguf
+last_receipt.json
+__pycache__/
+*.pyc

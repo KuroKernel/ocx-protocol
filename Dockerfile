@@ -1,52 +1,67 @@
-# Multi-stage build for OCX Protocol
-FROM golang:1.24-alpine AS builder
+# OCX Protocol - Production Dockerfile
+# Multi-stage build for minimal image size
 
-# Install build dependencies (including CGO dependencies for sqlite3)
-RUN apk add --no-cache git make gcc musl-dev
+# ============================================
+# Stage 1: Build
+# ============================================
+FROM golang:1.23-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates tzdata
 
 # Set working directory
-WORKDIR /app
+WORKDIR /build
 
-# Copy go mod files
+# Copy go mod files first for caching
 COPY go.mod go.sum ./
-RUN go mod download
+
+# Downgrade x/time to version compatible with Go 1.23
+RUN go mod edit -require golang.org/x/time@v0.5.0 && go mod download
 
 # Copy source code
 COPY . .
 
-# Build the server application
-RUN CGO_ENABLED=1 go build -ldflags="-w -s" -o server ./cmd/server
+# Build server binary (CGO_ENABLED=0 for static binary)
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /build/bin/ocx-server ./cmd/server
 
-# Runtime stage
-FROM alpine:latest
+# ============================================
+# Stage 2: Runtime
+# ============================================
+FROM alpine:3.19 AS runtime
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates tzdata
 
 # Create non-root user
-RUN adduser -D -s /bin/sh ocx
+RUN addgroup -g 1000 ocx && \
+    adduser -u 1000 -G ocx -s /bin/sh -D ocx
 
-# Set working directory
+# Create directories
+RUN mkdir -p /app/bin /app/data /app/logs && \
+    chown -R ocx:ocx /app
+
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /app/server /app/server
+COPY --from=builder /build/bin/ocx-server /app/bin/
 
-# Copy database schema
-COPY --from=builder /app/database/migrations /app/database/migrations
-
-# Set ownership
-RUN chown -R ocx:ocx /app
+# Set permissions
+RUN chmod +x /app/bin/ocx-server
 
 # Switch to non-root user
 USER ocx
+
+# Environment variables
+ENV OCX_DATA_DIR=/app/data
+ENV OCX_LOG_DIR=/app/logs
+ENV OCX_PORT=8080
 
 # Expose port
 EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/livez || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget -qO- http://localhost:8080/health || exit 1
 
 # Default command
-CMD ["./server"]
+CMD ["/app/bin/ocx-server"]

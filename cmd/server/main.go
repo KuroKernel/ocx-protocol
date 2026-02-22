@@ -13,6 +13,7 @@ import (
 	"log"
 	"net/http"
 	"os/exec"
+	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -183,6 +184,16 @@ func NewServer() (*Server, error) {
 			store = receipt.NewPostgresStore(pool)
 			log.Printf("Using PostgreSQL store")
 
+
+			// Run database migrations if OCX_DB_MIGRATE is set
+			if os.Getenv("OCX_DB_MIGRATE") == "true" {
+				log.Printf("Running database migrations...")
+				if err := database.Migrate(ctx, pool, ""); err != nil {
+					log.Printf("Warning: Migration failed: %v", err)
+				} else {
+					log.Printf("Database migrations completed successfully")
+				}
+			}
 			// Create reputation store (only works with PostgreSQL)
 			reputationStore = reputation.NewRepository(pool)
 			log.Printf("Reputation store initialized")

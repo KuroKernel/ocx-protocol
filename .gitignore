@@ -40,11 +40,11 @@ node_modules/
 coverage.out
 coverage.html
 
-# Go modules
-go.sum
+# Go modules (go.sum must be committed for reproducible builds)
+# go.sum — NOT ignored, required by Docker build
 
-# Rust build artifacts
-Cargo.lock
+# Rust build artifacts (Cargo.lock must be committed for reproducible builds)
+# Cargo.lock — NOT ignored, required by Docker build
 target/
 **/*.rs.bk
 

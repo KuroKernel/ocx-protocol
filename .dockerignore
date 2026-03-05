@@ -12,3 +12,6 @@ coverage.out
 coverage.html
 *.log
 .DS_Store
+
+# Rust build artifacts (built inside Docker, not needed from host)
+libocx-verify/target/

@@ -1,12 +1,7 @@
 # Nixpacks configuration for OCX Protocol
+# Uses Dockerfile for multi-stage Rust+Go build
 [phases.setup]
-nixPkgs = ["go_1_24"]
+onlyIncludeFiles = ["Dockerfile"]
 
 [phases.build]
-cmds = [
-  "go mod download",
-  "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags=\"-w -s\" -o /app/bin/ocx-server ./cmd/server"
-]
-
-[start]
-cmd = "/app/bin/ocx-server"
+cmds = ["echo 'Using Dockerfile for build'"]

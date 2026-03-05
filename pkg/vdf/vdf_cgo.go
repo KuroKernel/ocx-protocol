@@ -1,6 +1,5 @@
-// Package vdf provides Go bindings to the Rust VDF (Verifiable Delay Function)
-// implementation via CGO/FFI. It wraps the Wesolowski VDF construction for
-// computing and verifying temporal proofs in OCX receipts.
+//go:build cgo
+
 package vdf
 
 /*
@@ -13,33 +12,6 @@ import (
 	"fmt"
 	"unsafe"
 )
-
-// Proof represents a VDF temporal proof result.
-type Proof struct {
-	Output    []byte // VDF output y = x^(2^T) mod N
-	Proof     []byte // Wesolowski proof π
-	Iterations uint64 // Number of sequential squarings T
-	ModulusID  string // Modulus identifier (e.g., "ocx-vdf-v1")
-	DurationMs uint64 // Wall-clock evaluation time in milliseconds
-}
-
-// Config controls VDF behavior for the server.
-type Config struct {
-	Enabled    bool   // Master switch for VDF computation
-	Iterations uint64 // Default T (e.g., 100_000 for ~1s)
-	ModulusID  string // Which modulus to use (default: "ocx-vdf-v1")
-	FailOpen   bool   // Continue without VDF on failure
-}
-
-// DefaultConfig returns a reasonable default VDF configuration.
-func DefaultConfig() Config {
-	return Config{
-		Enabled:    false, // Off by default until battle-tested
-		Iterations: 100_000,
-		ModulusID:  "ocx-vdf-v1",
-		FailOpen:   true,
-	}
-}
 
 // Evaluate computes a VDF temporal proof for the given 32-byte receipt hash.
 // This is intentionally slow (~1s for T=100,000) and non-parallelizable.

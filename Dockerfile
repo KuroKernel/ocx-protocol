@@ -1,38 +1,61 @@
-# OCX Protocol - Production Dockerfile
-# Multi-stage build for minimal image size
+# OCX Protocol - Production Dockerfile with VDF (Rust + Go CGO)
+# Multi-stage build: Rust library → Go binary → minimal runtime
 
 # ============================================
-# Stage 1: Build
+# Stage 1: Build Rust VDF library
 # ============================================
-FROM golang:1.23-alpine AS builder
+FROM rust:1.83-slim-bookworm AS rust-builder
 
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates tzdata
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pkg-config libssl-dev && \
+    rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+WORKDIR /build
+COPY libocx-verify/ ./libocx-verify/
+
+WORKDIR /build/libocx-verify
+RUN cargo build --release --features ffi 2>&1 | tail -5
+
+# ============================================
+# Stage 2: Build Go server with CGO (links Rust)
+# ============================================
+FROM golang:1.23-bookworm AS go-builder
+
+# Install C toolchain for CGO
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc libc6-dev ca-certificates tzdata && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /build
 
-# Copy all source code
+# Copy Rust build artifacts
+COPY --from=rust-builder /build/libocx-verify/target/release/liblibocx_verify.a /build/libocx-verify/target/release/
+COPY --from=rust-builder /build/libocx-verify/target/release/liblibocx_verify.so /build/libocx-verify/target/release/
+
+# Copy Rust headers
+COPY libocx-verify/ocx_verify.h /build/libocx-verify/
+
+# Copy Go source
+COPY go.mod go.sum ./
+RUN go mod download
 COPY . .
 
-# Downgrade Go version and x/time to be compatible with Go 1.23, then build
-RUN go mod edit -go=1.23 -require golang.org/x/time@v0.5.0 && \
-    sed -i '/^toolchain/d' go.mod && \
-    go mod tidy && \
-    go mod download && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /build/bin/ocx-server ./cmd/server
+# Build with CGO enabled (links Rust VDF library)
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-w -s" -o /build/bin/ocx-server ./cmd/server
 
 # ============================================
-# Stage 2: Runtime
+# Stage 3: Minimal runtime
 # ============================================
-FROM alpine:3.19 AS runtime
+FROM debian:bookworm-slim AS runtime
 
-# Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates tzdata wget && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN addgroup -g 1000 ocx && \
-    adduser -u 1000 -G ocx -s /bin/sh -D ocx
+RUN groupadd -g 1000 ocx && \
+    useradd -u 1000 -g ocx -s /bin/sh -m ocx
 
 # Create directories
 RUN mkdir -p /app/bin /app/data /app/logs && \
@@ -40,26 +63,21 @@ RUN mkdir -p /app/bin /app/data /app/logs && \
 
 WORKDIR /app
 
-# Copy binary from builder
-COPY --from=builder /build/bin/ocx-server /app/bin/
+# Copy binary and Rust shared library
+COPY --from=go-builder /build/bin/ocx-server /app/bin/
+COPY --from=rust-builder /build/libocx-verify/target/release/liblibocx_verify.so /usr/lib/
 
-# Set permissions
-RUN chmod +x /app/bin/ocx-server
+RUN ldconfig && chmod +x /app/bin/ocx-server
 
-# Switch to non-root user
 USER ocx
 
-# Environment variables
 ENV OCX_DATA_DIR=/app/data
 ENV OCX_LOG_DIR=/app/logs
 ENV OCX_PORT=8080
 
-# Expose port
 EXPOSE 8080
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD wget -qO- http://localhost:8080/health || exit 1
 
-# Default command
 CMD ["/app/bin/ocx-server"]

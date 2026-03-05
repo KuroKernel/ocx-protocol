@@ -23,6 +23,10 @@ serde = { version = "1.0", features = ["derive"] } # Serialization framework.
 serde_json = "1.0" # JSON parsing for configuration files.
 serde_cbor = "0.11" # CBOR serialization/deserialization.
 ciborium = "0.2" # CBOR serialization/deserialization.
+num-bigint = "0.4" # Arbitrary precision integers for VDF.
+num-traits = "0.2" # Numeric trait helpers for VDF.
+num-integer = "0.1" # Integer math (gcd, etc.) for VDF.
+sha2 = "0.10" # SHA-256 for VDF challenge derivation.
 
 [dev-dependencies]
 tempfile = "3.0" # Temporary files for tests.

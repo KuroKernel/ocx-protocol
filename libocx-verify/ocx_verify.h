@@ -105,6 +105,34 @@ size_t ocx_verify_receipts_batch(
     bool* results
 );
 
+// ── VDF (Verifiable Delay Function) ─────────────────────────────────────
+
+/// VDF proof structure for temporal proofs.
+typedef struct {
+    uint8_t output[256];        // VDF output y = x^(2^T) mod N (big-endian, right-aligned)
+    uint32_t output_len;        // Actual length of output bytes
+    uint8_t proof[256];         // Wesolowski proof π (big-endian, right-aligned)
+    uint32_t proof_len;         // Actual length of proof bytes
+    uint64_t iterations;        // Number of sequential squarings T
+    uint8_t modulus_id[64];     // Null-terminated ASCII modulus identifier
+    uint64_t duration_ms;       // Wall-clock time taken in milliseconds
+} OcxVdfProof;
+
+/// Evaluate VDF: compute temporal proof for a 32-byte receipt hash.
+/// Returns error code (OCX_SUCCESS on success).
+OcxErrorCode ocx_vdf_evaluate(
+    const uint8_t* receipt_hash,    // 32-byte SHA-256 hash
+    uint64_t iterations,            // Number of sequential squarings T
+    OcxVdfProof* out_proof          // Output proof struct
+);
+
+/// Verify a VDF proof against a 32-byte receipt hash.
+/// Returns true if the VDF proof is valid, false otherwise.
+bool ocx_vdf_verify(
+    const uint8_t* receipt_hash,    // 32-byte SHA-256 hash
+    const OcxVdfProof* proof        // Proof struct to verify
+);
+
 #ifdef __cplusplus
 }
 #endif

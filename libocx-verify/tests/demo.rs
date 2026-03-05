@@ -20,6 +20,10 @@ fn demo_receipt_creation_and_verification() {
         prev_receipt_hash: None,
         request_digest: None,
         witness_signatures: Vec::new(),
+        vdf_output: None,
+        vdf_proof: None,
+        vdf_iterations: None,
+        vdf_modulus_id: None,
     };
     
     // Test canonical CBOR encoding

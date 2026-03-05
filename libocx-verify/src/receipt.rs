@@ -31,6 +31,14 @@ pub struct OcxReceipt {
     pub request_digest: Option<[u8; 32]>,
     /// Optional: Additional witness signatures for multi-party verification.
     pub witness_signatures: Vec<Vec<u8>>,
+    /// Optional: VDF output y = x^(2^T) mod N (temporal proof, v1.2).
+    pub vdf_output: Option<Vec<u8>>,
+    /// Optional: Wesolowski proof π (temporal proof, v1.2).
+    pub vdf_proof: Option<Vec<u8>>,
+    /// Optional: VDF iterations T (temporal proof, v1.2).
+    pub vdf_iterations: Option<u64>,
+    /// Optional: VDF modulus identifier (temporal proof, v1.2).
+    pub vdf_modulus_id: Option<String>,
 }
 
 /// Helper struct for unsigned receipt serialization
@@ -46,6 +54,14 @@ pub struct UnsignedReceipt {
     pub prev_receipt_hash: Option<[u8; 32]>,
     pub request_digest: Option<[u8; 32]>,
     pub witness_signatures: Vec<Vec<u8>>,
+    /// Optional: VDF output (v1.2 temporal proof).
+    pub vdf_output: Option<Vec<u8>>,
+    /// Optional: Wesolowski proof (v1.2 temporal proof).
+    pub vdf_proof: Option<Vec<u8>>,
+    /// Optional: VDF iterations (v1.2 temporal proof).
+    pub vdf_iterations: Option<u64>,
+    /// Optional: VDF modulus identifier (v1.2 temporal proof).
+    pub vdf_modulus_id: Option<String>,
 }
 
 impl OcxReceipt {
@@ -85,6 +101,12 @@ impl OcxReceipt {
         let request_digest = Self::extract_optional_hash(&map, 10)?;
         let witness_signatures = Self::extract_optional_signatures(&map, 11)?;
 
+        // Extract optional VDF fields (v1.2 temporal proof)
+        let vdf_output = Self::extract_optional_bytes(&map, 12)?;
+        let vdf_proof = Self::extract_optional_bytes(&map, 13)?;
+        let vdf_iterations = Self::extract_optional_uint64(&map, 14)?;
+        let vdf_modulus_id = Self::extract_optional_string(&map, 15)?;
+
         // Validate field constraints
         Self::validate_timestamps(started_at, finished_at)?;
         Self::validate_cycles(cycles_used)?;
@@ -103,6 +125,10 @@ impl OcxReceipt {
             prev_receipt_hash,
             request_digest,
             witness_signatures,
+            vdf_output,
+            vdf_proof,
+            vdf_iterations,
+            vdf_modulus_id,
         })
     }
 
@@ -170,9 +196,35 @@ impl OcxReceipt {
             );
         }
 
+        // Add VDF fields if present (v1.2 temporal proof — signature covers these)
+        if let Some(ref vdf_output) = self.vdf_output {
+            map.insert(
+                CanonicalValue::Integer(12),
+                CanonicalValue::Bytes(vdf_output.clone()),
+            );
+        }
+        if let Some(ref vdf_proof) = self.vdf_proof {
+            map.insert(
+                CanonicalValue::Integer(13),
+                CanonicalValue::Bytes(vdf_proof.clone()),
+            );
+        }
+        if let Some(vdf_iterations) = self.vdf_iterations {
+            map.insert(
+                CanonicalValue::Integer(14),
+                CanonicalValue::Integer(vdf_iterations),
+            );
+        }
+        if let Some(ref vdf_modulus_id) = self.vdf_modulus_id {
+            map.insert(
+                CanonicalValue::Integer(15),
+                CanonicalValue::Text(vdf_modulus_id.clone()),
+            );
+        }
+
         // Serialize to canonical CBOR
         let cbor_data = Self::serialize_canonical_map(&map)?;
-        
+
         // Create the complete signing message with domain separator
         let domain_separator = b"OCXv1|receipt|";
         let mut message = Vec::new();
@@ -252,6 +304,42 @@ impl OcxReceipt {
             Some(CanonicalValue::Text(text)) => Ok(text.clone()),
             None => Err(VerificationError::MissingField(field_name)),
             _ => Err(VerificationError::InvalidFieldValue(field_name)),
+        }
+    }
+
+    /// Extract optional bytes from the map.
+    fn extract_optional_bytes(
+        map: &BTreeMap<CanonicalValue, CanonicalValue>,
+        key: u64,
+    ) -> Result<Option<Vec<u8>>, VerificationError> {
+        match map.get(&CanonicalValue::Integer(key)) {
+            Some(CanonicalValue::Bytes(bytes)) => Ok(Some(bytes.clone())),
+            None => Ok(None),
+            _ => Err(VerificationError::InvalidFieldValue("optional_bytes")),
+        }
+    }
+
+    /// Extract optional uint64 from the map.
+    fn extract_optional_uint64(
+        map: &BTreeMap<CanonicalValue, CanonicalValue>,
+        key: u64,
+    ) -> Result<Option<u64>, VerificationError> {
+        match map.get(&CanonicalValue::Integer(key)) {
+            Some(CanonicalValue::Integer(value)) => Ok(Some(*value)),
+            None => Ok(None),
+            _ => Err(VerificationError::InvalidFieldValue("optional_uint64")),
+        }
+    }
+
+    /// Extract optional string from the map.
+    fn extract_optional_string(
+        map: &BTreeMap<CanonicalValue, CanonicalValue>,
+        key: u64,
+    ) -> Result<Option<String>, VerificationError> {
+        match map.get(&CanonicalValue::Integer(key)) {
+            Some(CanonicalValue::Text(text)) => Ok(Some(text.clone())),
+            None => Ok(None),
+            _ => Err(VerificationError::InvalidFieldValue("optional_string")),
         }
     }
 
@@ -374,6 +462,20 @@ impl OcxReceipt {
             map.insert(CanonicalValue::Integer(11), CanonicalValue::Array(witness_array)); // witness_signatures
         }
 
+        // Add VDF fields if present (v1.2 temporal proof)
+        if let Some(ref vdf_output) = self.vdf_output {
+            map.insert(CanonicalValue::Integer(12), CanonicalValue::Bytes(vdf_output.clone()));
+        }
+        if let Some(ref vdf_proof) = self.vdf_proof {
+            map.insert(CanonicalValue::Integer(13), CanonicalValue::Bytes(vdf_proof.clone()));
+        }
+        if let Some(vdf_iterations) = self.vdf_iterations {
+            map.insert(CanonicalValue::Integer(14), CanonicalValue::Integer(vdf_iterations));
+        }
+        if let Some(ref vdf_modulus_id) = self.vdf_modulus_id {
+            map.insert(CanonicalValue::Integer(15), CanonicalValue::Text(vdf_modulus_id.clone()));
+        }
+
         // Serialize to canonical CBOR
         Self::serialize_canonical_map(&map)
     }
@@ -386,6 +488,13 @@ impl OcxReceipt {
         
         let core_cbor = core_receipt.to_canonical_cbor()?;
         Ok(crate::spec::create_signing_message(&core_cbor))
+    }
+
+    /// Public access to serialize_canonical_map for use by verify module.
+    pub fn serialize_canonical_map_public(
+        map: &BTreeMap<CanonicalValue, CanonicalValue>,
+    ) -> Result<Vec<u8>, VerificationError> {
+        Self::serialize_canonical_map(map)
     }
 
     /// Serialize a canonical CBOR map to bytes.
@@ -644,16 +753,30 @@ impl OcxReceipt {
                 .collect();
             cbor_map.insert(serde_cbor::Value::Integer(11), serde_cbor::Value::Array(witness_array));
         }
-        
+
+        // VDF fields (v1.2 temporal proof — signature covers these)
+        if let Some(ref vdf_output) = unsigned.vdf_output {
+            cbor_map.insert(serde_cbor::Value::Integer(12), serde_cbor::Value::Bytes(vdf_output.clone()));
+        }
+        if let Some(ref vdf_proof) = unsigned.vdf_proof {
+            cbor_map.insert(serde_cbor::Value::Integer(13), serde_cbor::Value::Bytes(vdf_proof.clone()));
+        }
+        if let Some(vdf_iterations) = unsigned.vdf_iterations {
+            cbor_map.insert(serde_cbor::Value::Integer(14), serde_cbor::Value::Integer(vdf_iterations as i128));
+        }
+        if let Some(ref vdf_modulus_id) = unsigned.vdf_modulus_id {
+            cbor_map.insert(serde_cbor::Value::Integer(15), serde_cbor::Value::Text(vdf_modulus_id.clone()));
+        }
+
         // Note: Signature field (key 8) is intentionally omitted for signing
-        
+
         let cbor_value = serde_cbor::Value::Map(cbor_map);
-        
+
         // Serialize with deterministic encoding
         let mut buffer = Vec::new();
         serde_cbor::to_writer(&mut buffer, &cbor_value)
             .map_err(|_| VerificationError::InvalidCbor)?;
-            
+
         Ok(buffer)
     }
 
@@ -687,12 +810,34 @@ impl OcxReceipt {
                 .collect();
             cbor_map.insert(serde_cbor::Value::Integer(11), serde_cbor::Value::Array(witness_array));
         }
-        
+
+        // VDF fields (v1.2 temporal proof)
+        if let Some(ref vdf_output) = self.vdf_output {
+            cbor_map.insert(serde_cbor::Value::Integer(12), serde_cbor::Value::Bytes(vdf_output.clone()));
+        }
+        if let Some(ref vdf_proof) = self.vdf_proof {
+            cbor_map.insert(serde_cbor::Value::Integer(13), serde_cbor::Value::Bytes(vdf_proof.clone()));
+        }
+        if let Some(vdf_iterations) = self.vdf_iterations {
+            cbor_map.insert(serde_cbor::Value::Integer(14), serde_cbor::Value::Integer(vdf_iterations as i128));
+        }
+        if let Some(ref vdf_modulus_id) = self.vdf_modulus_id {
+            cbor_map.insert(serde_cbor::Value::Integer(15), serde_cbor::Value::Text(vdf_modulus_id.clone()));
+        }
+
         let cbor_value = serde_cbor::Value::Map(cbor_map);
         let mut buffer = Vec::new();
         serde_cbor::to_writer(&mut buffer, &cbor_value)
             .map_err(|_| VerificationError::InvalidCbor)?;
-            
+
         Ok(buffer)
+    }
+
+    /// Returns true if this receipt contains VDF temporal proof fields.
+    pub fn has_vdf_proof(&self) -> bool {
+        self.vdf_output.is_some()
+            && self.vdf_proof.is_some()
+            && self.vdf_iterations.is_some()
+            && self.vdf_modulus_id.is_some()
     }
 }

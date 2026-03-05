@@ -14,6 +14,7 @@ pub mod debug;
 pub mod error;
 pub mod receipt;
 pub mod spec;
+pub mod vdf;
 pub mod verify;
 
 // FFI module with unsafe code

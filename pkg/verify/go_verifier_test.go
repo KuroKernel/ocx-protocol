@@ -91,7 +91,11 @@ func TestGoVerifierVerifyReceipt(t *testing.T) {
 		if verifiedCore == nil {
 			t.Error("Expected non-nil verified core")
 		}
-		if *verifiedCore != receiptCore {
+		if verifiedCore.ProgramHash != receiptCore.ProgramHash ||
+			verifiedCore.InputHash != receiptCore.InputHash ||
+			verifiedCore.OutputHash != receiptCore.OutputHash ||
+			verifiedCore.GasUsed != receiptCore.GasUsed ||
+			verifiedCore.IssuerID != receiptCore.IssuerID {
 			t.Error("Expected verified core to match original core")
 		}
 	})

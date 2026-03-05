@@ -9,6 +9,7 @@
 
 use crate::{OcxReceipt, VerificationError};
 use crate::receipt::UnsignedReceipt;
+use crate::vdf;
 use ring::signature::{UnparsedPublicKey, ED25519};
 use ring::digest::{digest, SHA256};
 use ed25519_dalek::{Verifier, VerifyingKey, Signature};
@@ -235,6 +236,13 @@ pub fn verify_receipt(
         trace!("--- Step 7: Verify receipt chain ---");
         verify_receipt_chain_with_tracing(&receipt)?;
         trace!("✅ Receipt chain verified");
+    }
+
+    // 8. Verify VDF temporal proof if present
+    if receipt.has_vdf_proof() {
+        trace!("--- Step 8: Verify VDF temporal proof ---");
+        verify_vdf_proof(&receipt)?;
+        trace!("✅ VDF temporal proof verified");
     }
 
     trace!("=== Receipt verification completed successfully ===");
@@ -730,6 +738,8 @@ pub struct VerificationPolicy {
     pub verify_hashes: bool,
     pub verify_witnesses: bool,
     pub verify_chain: bool,
+    /// Whether to verify VDF temporal proofs (if present in the receipt).
+    pub verify_vdf: bool,
 }
 
 impl Default for VerificationPolicy {
@@ -741,6 +751,7 @@ impl Default for VerificationPolicy {
             verify_hashes: true,
             verify_witnesses: false,
             verify_chain: false,
+            verify_vdf: true,
         }
     }
 }
@@ -777,6 +788,10 @@ pub fn verify_receipt_with_policy(
     if policy.verify_chain {
         let chain = get_receipt_chain();
         verify_receipt_chain_production(&receipt, chain)?;
+    }
+
+    if policy.verify_vdf && receipt.has_vdf_proof() {
+        verify_vdf_proof(&receipt)?;
     }
 
     Ok(receipt)
@@ -949,6 +964,96 @@ fn verify_timestamps_with_policy(receipt: &OcxReceipt) -> Result<(), Verificatio
 
     trace!("✅ Timestamp validation passed");
     Ok(())
+}
+
+/// Verify the VDF temporal proof embedded in a receipt.
+///
+/// This checks that all 4 VDF fields are present and consistent, looks up the
+/// modulus parameters, recomputes the challenge from the receipt's signed data hash,
+/// and verifies the Wesolowski proof.
+fn verify_vdf_proof(receipt: &OcxReceipt) -> Result<(), VerificationError> {
+    // All 4 VDF fields must be present (has_vdf_proof already checked this)
+    let vdf_output = receipt.vdf_output.as_ref()
+        .ok_or(VerificationError::MissingField("vdf_output"))?;
+    let vdf_proof = receipt.vdf_proof.as_ref()
+        .ok_or(VerificationError::MissingField("vdf_proof"))?;
+    let vdf_iterations = receipt.vdf_iterations
+        .ok_or(VerificationError::MissingField("vdf_iterations"))?;
+    let vdf_modulus_id = receipt.vdf_modulus_id.as_ref()
+        .ok_or(VerificationError::MissingField("vdf_modulus_id"))?;
+
+    // Look up VDF parameters by modulus ID
+    let params = vdf::get_params(vdf_modulus_id)
+        .map_err(|_| VerificationError::InvalidFieldValue("vdf_modulus_id"))?;
+
+    // Validate iterations are within bounds
+    params.validate_iterations(vdf_iterations)
+        .map_err(|_| VerificationError::InvalidFieldValue("vdf_iterations"))?;
+
+    // Compute the receipt hash (SHA-256 of the signed data excluding VDF fields)
+    // We need the hash of the core receipt data that the VDF was computed over.
+    // The VDF challenge is derived from the receipt hash (keys 1-7 + optional 9-11).
+    let core_cbor = receipt_core_hash(receipt)?;
+
+    // Derive the VDF challenge from the receipt core hash
+    let challenge = vdf::derive_challenge(&core_cbor, &params.modulus);
+
+    // Convert stored output and proof to BigUint for verification
+    use num_bigint::BigUint;
+    let output = BigUint::from_bytes_be(vdf_output);
+    let proof_val = BigUint::from_bytes_be(vdf_proof);
+
+    // Verify the Wesolowski proof
+    let valid = vdf::verify(&challenge, &output, &proof_val, vdf_iterations, &params)
+        .map_err(|_| VerificationError::InvalidFieldValue("vdf_proof"))?;
+
+    if !valid {
+        trace!("❌ VDF proof verification failed");
+        return Err(VerificationError::InvalidFieldValue("vdf_proof"));
+    }
+
+    trace!("✅ VDF proof verified: iterations={}, modulus={}", vdf_iterations, vdf_modulus_id);
+    Ok(())
+}
+
+/// Compute the SHA-256 hash of the receipt core data (keys 1-7 + optional 9-11,
+/// excluding signature and VDF fields). This is the input to VDF challenge derivation.
+fn receipt_core_hash(receipt: &OcxReceipt) -> Result<[u8; 32], VerificationError> {
+    use std::collections::BTreeMap;
+    use crate::canonical_cbor::CanonicalValue;
+
+    let mut map = BTreeMap::new();
+
+    // Core fields (keys 1-7)
+    map.insert(CanonicalValue::Integer(1), CanonicalValue::Bytes(receipt.artifact_hash.to_vec()));
+    map.insert(CanonicalValue::Integer(2), CanonicalValue::Bytes(receipt.input_hash.to_vec()));
+    map.insert(CanonicalValue::Integer(3), CanonicalValue::Bytes(receipt.output_hash.to_vec()));
+    map.insert(CanonicalValue::Integer(4), CanonicalValue::Integer(receipt.cycles_used));
+    map.insert(CanonicalValue::Integer(5), CanonicalValue::Integer(receipt.started_at));
+    map.insert(CanonicalValue::Integer(6), CanonicalValue::Integer(receipt.finished_at));
+    map.insert(CanonicalValue::Integer(7), CanonicalValue::Text(receipt.issuer_key_id.clone()));
+
+    // Optional fields (keys 9-11)
+    if let Some(prev_hash) = receipt.prev_receipt_hash {
+        map.insert(CanonicalValue::Integer(9), CanonicalValue::Bytes(prev_hash.to_vec()));
+    }
+    if let Some(request_digest) = receipt.request_digest {
+        map.insert(CanonicalValue::Integer(10), CanonicalValue::Bytes(request_digest.to_vec()));
+    }
+    if !receipt.witness_signatures.is_empty() {
+        let witness_array: Vec<CanonicalValue> = receipt.witness_signatures
+            .iter()
+            .map(|sig| CanonicalValue::Bytes(sig.clone()))
+            .collect();
+        map.insert(CanonicalValue::Integer(11), CanonicalValue::Array(witness_array));
+    }
+
+    // Serialize to canonical CBOR then SHA-256 hash
+    let cbor_bytes = OcxReceipt::serialize_canonical_map_public(&map)?;
+    let hash = digest(&SHA256, &cbor_bytes);
+    let mut result = [0u8; 32];
+    result.copy_from_slice(hash.as_ref());
+    Ok(result)
 }
 
 // Normalize public key to standard 32-byte Ed25519 format

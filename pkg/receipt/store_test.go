@@ -177,7 +177,11 @@ func TestMemoryStoreReceiptByCore(t *testing.T) {
 		if retrievedReceipt == nil {
 			t.Error("Expected non-nil receipt")
 		}
-		if retrievedReceipt.Core != core {
+		if retrievedReceipt.Core.ProgramHash != core.ProgramHash ||
+			retrievedReceipt.Core.InputHash != core.InputHash ||
+			retrievedReceipt.Core.OutputHash != core.OutputHash ||
+			retrievedReceipt.Core.GasUsed != core.GasUsed ||
+			retrievedReceipt.Core.IssuerID != core.IssuerID {
 			t.Error("Expected matching receipt core")
 		}
 	})

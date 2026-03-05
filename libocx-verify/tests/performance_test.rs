@@ -16,6 +16,10 @@ fn test_dual_crypto_performance_target() {
         request_digest: None,
         witness_signatures: vec![],
         signature: vec![4u8; 64], // Placeholder signature
+        vdf_output: None,
+        vdf_proof: None,
+        vdf_iterations: None,
+        vdf_modulus_id: None,
     };
     
     let cbor_data = receipt.to_canonical_cbor().unwrap();

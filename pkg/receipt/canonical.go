@@ -26,6 +26,20 @@ func CanonicalizeCore(r *ReceiptCore) ([]byte, error) {
 	m[6] = r.FinishedAt
 	m[7] = r.IssuerID
 
+	// Include VDF fields if present (v1.2 temporal proof — covered by signature)
+	if len(r.VdfOutput) > 0 {
+		m[12] = r.VdfOutput
+	}
+	if len(r.VdfProof) > 0 {
+		m[13] = r.VdfProof
+	}
+	if r.VdfIter > 0 {
+		m[14] = r.VdfIter
+	}
+	if r.VdfModulusID != "" {
+		m[15] = r.VdfModulusID
+	}
+
 	return em.Marshal(m)
 }
 

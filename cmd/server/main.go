@@ -33,6 +33,7 @@ import (
 	"ocx.local/pkg/reputation"
 	"ocx.local/pkg/scaling"
 	"ocx.local/pkg/security"
+	"ocx.local/pkg/vdf"
 	"ocx.local/pkg/verify"
 
 	cbor "github.com/fxamacker/cbor/v2"
@@ -137,6 +138,7 @@ type Server struct {
 	distributedCache        *scaling.DistributedCache
 	sessionManager          *scaling.SessionManager
 	rateLimiter             *security.RateLimiter
+	vdfConfig               vdf.Config
 	port                    string
 }
 
@@ -235,6 +237,24 @@ func NewServer() (*Server, error) {
 	rateLimiter := security.NewRateLimiter(10, 20)
 	log.Printf("Rate limiter initialized: 10 req/s with burst of 20")
 
+	// Initialize VDF configuration from environment
+	vdfCfg := vdf.DefaultConfig()
+	if os.Getenv("OCX_VDF_ENABLED") == "true" {
+		vdfCfg.Enabled = true
+		log.Printf("VDF temporal proofs enabled")
+	}
+	if iterStr := os.Getenv("OCX_VDF_ITERATIONS"); iterStr != "" {
+		if iter, err := strconv.ParseUint(iterStr, 10, 64); err == nil {
+			vdfCfg.Iterations = iter
+		}
+	}
+	if modID := os.Getenv("OCX_VDF_MODULUS_ID"); modID != "" {
+		vdfCfg.ModulusID = modID
+	}
+	if os.Getenv("OCX_VDF_FAIL_OPEN") == "false" {
+		vdfCfg.FailOpen = false
+	}
+
 	return &Server{
 		verifier:        verify.NewVerifier(),
 		signer:          signer,
@@ -244,6 +264,7 @@ func NewServer() (*Server, error) {
 		metrics:         metricsInstance,
 		healthChecker:   healthChecker,
 		rateLimiter:     rateLimiter,
+		vdfConfig:       vdfCfg,
 		port:            port,
 	}, nil
 }
@@ -288,13 +309,35 @@ func (s *Server) handleVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	msg := append([]byte("OCXv1|receipt|"), coreBytes...)
 	ok := ed25519.Verify(ed25519.PublicKey(pubRaw), msg, full.Signature)
+	coreHash := sha256.Sum256(coreBytes)
 	extras := map[string]any{
-		"core_hash": fmt.Sprintf("%x", sha256.Sum256(coreBytes)),
+		"core_hash": fmt.Sprintf("%x", coreHash),
 	}
 	if !ok {
 		respondVerify(w, false, time.Since(start), fmt.Errorf("signature invalid"), extras)
 		return
 	}
+
+	// Verify VDF proof if present
+	vdfPresent := len(full.Core.VdfOutput) > 0
+	vdfVerified := false
+	extras["vdf_present"] = vdfPresent
+	if vdfPresent {
+		vdfProof := &vdf.Proof{
+			Output:     full.Core.VdfOutput,
+			Proof:      full.Core.VdfProof,
+			Iterations: full.Core.VdfIter,
+			ModulusID:  full.Core.VdfModulusID,
+		}
+		valid, vdfErr := vdf.Verify(coreHash, vdfProof)
+		if vdfErr != nil {
+			log.Printf("Warning: VDF verification error: %v", vdfErr)
+		}
+		vdfVerified = vdfErr == nil && valid
+		extras["vdf_verified"] = vdfVerified
+		extras["vdf_iterations"] = full.Core.VdfIter
+	}
+
 	respondVerify(w, true, time.Since(start), nil, extras)
 }
 
@@ -537,7 +580,41 @@ func (s *Server) handleExecute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. CANONICALIZE AND SIGN RECEIPT CORE
+	// 4. COMPUTE VDF TEMPORAL PROOF (if enabled)
+	if s.vdfConfig.Enabled {
+		// Canonicalize the core (keys 1-7 only) for VDF challenge input
+		preCoreBytes, err := receipt.CanonicalizeCore(receiptCore)
+		if err != nil {
+			if !s.vdfConfig.FailOpen {
+				s.sendError(w, "Failed to canonicalize receipt core for VDF", http.StatusInternalServerError)
+				return
+			}
+			log.Printf("Warning: VDF canonicalization failed: %v", err)
+		} else {
+			// Compute receipt core hash as VDF input
+			coreHash := sha256.Sum256(preCoreBytes)
+
+			// Evaluate VDF (intentionally slow — ~1s for T=100,000)
+			vdfProof, vdfErr := vdf.Evaluate(coreHash, s.vdfConfig.Iterations)
+			if vdfErr != nil {
+				if !s.vdfConfig.FailOpen {
+					s.sendError(w, fmt.Sprintf("VDF evaluation failed: %v", vdfErr), http.StatusInternalServerError)
+					return
+				}
+				log.Printf("Warning: VDF evaluation failed (fail-open): %v", vdfErr)
+			} else {
+				// Add VDF fields to receipt core (signature will cover these)
+				receiptCore.VdfOutput = vdfProof.Output
+				receiptCore.VdfProof = vdfProof.Proof
+				receiptCore.VdfIter = vdfProof.Iterations
+				receiptCore.VdfModulusID = vdfProof.ModulusID
+				log.Printf("VDF proof computed: T=%d, duration=%dms, modulus=%s",
+					vdfProof.Iterations, vdfProof.DurationMs, vdfProof.ModulusID)
+			}
+		}
+	}
+
+	// 5. CANONICALIZE AND SIGN RECEIPT CORE (now includes VDF fields if computed)
 	coreBytes, err := receipt.CanonicalizeCore(receiptCore)
 	if err != nil {
 		s.sendError(w, "Failed to canonicalize receipt core", http.StatusInternalServerError)
@@ -608,6 +685,19 @@ func (s *Server) handleExecute(w http.ResponseWriter, r *http.Request) {
 			"issuer_id":       receiptCore.IssuerID,
 			"public_key":      hex.EncodeToString(pubKey),
 		},
+	}
+
+	// Add VDF information to response if present
+	if len(receiptCore.VdfOutput) > 0 {
+		response["vdf"] = map[string]interface{}{
+			"present":    true,
+			"iterations": receiptCore.VdfIter,
+			"modulus_id": receiptCore.VdfModulusID,
+		}
+	} else {
+		response["vdf"] = map[string]interface{}{
+			"present": false,
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

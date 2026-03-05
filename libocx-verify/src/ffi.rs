@@ -11,6 +11,7 @@ use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
 use crate::{verify_receipt, verify_receipt_simple, VerificationError, OcxReceipt};
+use crate::vdf;
 
 /// Error codes for C API compatibility.
 #[repr(C)]
@@ -434,4 +435,173 @@ pub unsafe extern "C" fn ocx_verify_receipts_batch(
     }
 
     success_count
+}
+
+// ── VDF FFI ─────────────────────────────────────────────────────────────
+
+/// VDF proof result for C API.
+#[repr(C)]
+#[derive(Debug)]
+pub struct OcxVdfProof {
+    /// VDF output y = x^(2^T) mod N (big-endian bytes).
+    pub output: [u8; 256],
+    /// Actual length of output bytes.
+    pub output_len: u32,
+    /// Wesolowski proof π (big-endian bytes).
+    pub proof: [u8; 256],
+    /// Actual length of proof bytes.
+    pub proof_len: u32,
+    /// Number of sequential squarings.
+    pub iterations: u64,
+    /// Modulus identifier (null-terminated ASCII).
+    pub modulus_id: [u8; 64],
+    /// Wall-clock time taken in milliseconds.
+    pub duration_ms: u64,
+}
+
+/// Evaluate VDF: compute temporal proof for a 32-byte receipt hash.
+///
+/// # Safety
+/// - `receipt_hash` must point to exactly 32 bytes of valid memory
+/// - `out_proof` must point to a writable `OcxVdfProof` struct
+///
+/// # Arguments
+/// * `receipt_hash` - 32-byte SHA-256 hash of the receipt core
+/// * `iterations` - Number of sequential squarings T
+/// * `out_proof` - Output proof struct
+///
+/// # Returns
+/// * `OcxErrorCode::Success` on success
+/// * Error code on failure
+#[no_mangle]
+pub unsafe extern "C" fn ocx_vdf_evaluate(
+    receipt_hash: *const u8,
+    iterations: u64,
+    out_proof: *mut OcxVdfProof,
+) -> OcxErrorCode {
+    if receipt_hash.is_null() || out_proof.is_null() {
+        return OcxErrorCode::InvalidInput;
+    }
+
+    // Read the 32-byte hash
+    let hash_slice = slice::from_raw_parts(receipt_hash, 32);
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(hash_slice);
+
+    // Get default VDF parameters
+    let params = vdf::default_params();
+
+    // Validate iterations
+    if let Err(_) = params.validate_iterations(iterations) {
+        return OcxErrorCode::InvalidFieldValue;
+    }
+
+    // Derive challenge from receipt hash
+    let challenge = vdf::derive_challenge(&hash, &params.modulus);
+
+    // Evaluate VDF
+    let proof = match vdf::evaluate(&challenge, iterations, &params) {
+        Ok(p) => p,
+        Err(_) => return OcxErrorCode::InternalError,
+    };
+
+    // Copy output into FFI struct
+    let output_bytes = &proof.output;
+    let proof_bytes = &proof.proof;
+
+    if output_bytes.len() > 256 || proof_bytes.len() > 256 {
+        return OcxErrorCode::InternalError;
+    }
+
+    // Zero-initialize the output struct
+    ptr::write_bytes(out_proof, 0, 1);
+
+    // Copy output
+    ptr::copy_nonoverlapping(
+        output_bytes.as_ptr(),
+        (*out_proof).output.as_mut_ptr().add(256 - output_bytes.len()),
+        output_bytes.len(),
+    );
+    (*out_proof).output_len = output_bytes.len() as u32;
+
+    // Copy proof
+    ptr::copy_nonoverlapping(
+        proof_bytes.as_ptr(),
+        (*out_proof).proof.as_mut_ptr().add(256 - proof_bytes.len()),
+        proof_bytes.len(),
+    );
+    (*out_proof).proof_len = proof_bytes.len() as u32;
+
+    (*out_proof).iterations = iterations;
+    (*out_proof).duration_ms = proof.duration_ms;
+
+    // Copy modulus ID
+    let modulus_id = params.modulus_id.as_bytes();
+    let copy_len = std::cmp::min(modulus_id.len(), 63);
+    ptr::copy_nonoverlapping(
+        modulus_id.as_ptr(),
+        (*out_proof).modulus_id.as_mut_ptr(),
+        copy_len,
+    );
+
+    OcxErrorCode::Success
+}
+
+/// Verify a VDF proof against a 32-byte receipt hash.
+///
+/// # Safety
+/// - `receipt_hash` must point to exactly 32 bytes of valid memory
+/// - `proof` must point to a valid `OcxVdfProof` struct
+///
+/// # Returns
+/// * `true` if the VDF proof is valid
+/// * `false` if invalid or on error
+#[no_mangle]
+pub unsafe extern "C" fn ocx_vdf_verify(
+    receipt_hash: *const u8,
+    proof: *const OcxVdfProof,
+) -> bool {
+    if receipt_hash.is_null() || proof.is_null() {
+        return false;
+    }
+
+    // Read the 32-byte hash
+    let hash_slice = slice::from_raw_parts(receipt_hash, 32);
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(hash_slice);
+
+    // Extract modulus ID from proof
+    let modulus_id_bytes = &(*proof).modulus_id;
+    let modulus_id_len = modulus_id_bytes.iter().position(|&b| b == 0).unwrap_or(64);
+    let modulus_id = match std::str::from_utf8(&modulus_id_bytes[..modulus_id_len]) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+
+    // Look up VDF parameters
+    let params = match vdf::get_params(modulus_id) {
+        Ok(p) => p,
+        Err(_) => return false,
+    };
+
+    // Derive challenge
+    let challenge = vdf::derive_challenge(&hash, &params.modulus);
+
+    // Extract output and proof bytes (right-aligned in 256-byte buffer)
+    use num_bigint::BigUint;
+    let output_len = (*proof).output_len as usize;
+    let proof_len = (*proof).proof_len as usize;
+
+    if output_len == 0 || output_len > 256 || proof_len == 0 || proof_len > 256 {
+        return false;
+    }
+
+    let output = BigUint::from_bytes_be(&(*proof).output[256 - output_len..]);
+    let proof_val = BigUint::from_bytes_be(&(*proof).proof[256 - proof_len..]);
+
+    // Verify
+    match vdf::verify(&challenge, &output, &proof_val, (*proof).iterations, &params) {
+        Ok(valid) => valid,
+        Err(_) => false,
+    }
 }

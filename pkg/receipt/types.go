@@ -19,6 +19,12 @@ type ReceiptCore struct {
 	Nonce       [16]byte `cbor:"9,keyasint"`  // key 9 - 16-byte nonce for replay protection
 	IssuedAt    uint64   `cbor:"10,keyasint"` // key 10 - When receipt was issued (unix nanos)
 	FloatMode   string   `cbor:"11,keyasint"` // key 11 - Float handling: "disabled", "soft", "hard"
+
+	// VDF temporal proof fields (v1.2, optional)
+	VdfOutput    []byte `cbor:"12,keyasint,omitempty"` // key 12 - VDF output y = x^(2^T) mod N
+	VdfProof     []byte `cbor:"13,keyasint,omitempty"` // key 13 - Wesolowski proof π
+	VdfIter      uint64 `cbor:"14,keyasint,omitempty"` // key 14 - VDF iterations T
+	VdfModulusID string `cbor:"15,keyasint,omitempty"` // key 15 - VDF modulus identifier
 }
 
 // ReceiptFull represents the complete receipt with metadata

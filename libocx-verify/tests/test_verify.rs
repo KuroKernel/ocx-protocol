@@ -17,6 +17,10 @@ fn create_test_receipt() -> OcxReceipt {
         prev_receipt_hash: None,
         request_digest: None,
         witness_signatures: Vec::new(),
+        vdf_output: None,
+        vdf_proof: None,
+        vdf_iterations: None,
+        vdf_modulus_id: None,
     }
 }
 
@@ -36,6 +40,10 @@ fn create_test_receipt_with_valid_signature() -> (OcxReceipt, Vec<u8>) {
         prev_receipt_hash: None,
         request_digest: None,
         witness_signatures: Vec::new(),
+        vdf_output: None,
+        vdf_proof: None,
+        vdf_iterations: None,
+        vdf_modulus_id: None,
     };
     
     // Generate signed data and create a valid signature
@@ -233,6 +241,7 @@ fn test_verify_receipt_with_policy() {
         verify_hashes: false,
         verify_witnesses: false,
         verify_chain: false,
+        verify_vdf: true,
     };
     
     let result = verify_receipt_with_policy(&cbor_data, &public_key, policy);

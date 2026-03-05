@@ -19,7 +19,7 @@ RUN cargo build --release --features ffi 2>&1 | tail -5
 # ============================================
 # Stage 2: Build Go server with CGO (links Rust)
 # ============================================
-FROM golang:1.23-bookworm AS go-builder
+FROM golang:1.24-bookworm AS go-builder
 
 # Install C toolchain for CGO
 RUN apt-get update && apt-get install -y --no-install-recommends \

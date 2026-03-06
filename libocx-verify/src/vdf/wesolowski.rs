@@ -126,8 +126,9 @@ pub fn verify(
 
     let n = &params.modulus;
 
-    // Validate challenge is in range [1, N-1]
-    if challenge.is_zero() || challenge >= n {
+    // Validate challenge is in range [2, N-1] (matching evaluate's constraint).
+    // challenge=1 would yield trivially forgeable proof (1^(2^T) = 1).
+    if challenge < &BigUint::from(2u32) || challenge >= n {
         return Err(VdfError::InvalidChallenge);
     }
     // Out-of-range output or proof means the proof is simply invalid

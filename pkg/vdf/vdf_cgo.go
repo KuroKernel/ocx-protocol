@@ -30,11 +30,17 @@ func Evaluate(receiptHash [32]byte, iterations uint64) (*Proof, error) {
 
 	// Extract output bytes (right-aligned in 256-byte buffer)
 	outputLen := int(cProof.output_len)
+	if outputLen <= 0 || outputLen > 256 {
+		return nil, fmt.Errorf("VDF output length out of bounds: %d", outputLen)
+	}
 	output := make([]byte, outputLen)
 	copy(output, C.GoBytes(unsafe.Pointer(&cProof.output[256-outputLen]), C.int(outputLen)))
 
 	// Extract proof bytes (right-aligned in 256-byte buffer)
 	proofLen := int(cProof.proof_len)
+	if proofLen <= 0 || proofLen > 256 {
+		return nil, fmt.Errorf("VDF proof length out of bounds: %d", proofLen)
+	}
 	proof := make([]byte, proofLen)
 	copy(proof, C.GoBytes(unsafe.Pointer(&cProof.proof[256-proofLen]), C.int(proofLen)))
 

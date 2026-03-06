@@ -479,6 +479,20 @@ pub unsafe extern "C" fn ocx_vdf_evaluate(
     iterations: u64,
     out_proof: *mut OcxVdfProof,
 ) -> OcxErrorCode {
+    // Prevent panics from unwinding across the FFI boundary (undefined behavior).
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        ocx_vdf_evaluate_inner(receipt_hash, iterations, out_proof)
+    })) {
+        Ok(result) => result,
+        Err(_) => OcxErrorCode::InternalError,
+    }
+}
+
+unsafe fn ocx_vdf_evaluate_inner(
+    receipt_hash: *const u8,
+    iterations: u64,
+    out_proof: *mut OcxVdfProof,
+) -> OcxErrorCode {
     if receipt_hash.is_null() || out_proof.is_null() {
         return OcxErrorCode::InvalidInput;
     }
@@ -558,6 +572,19 @@ pub unsafe extern "C" fn ocx_vdf_evaluate(
 /// * `false` if invalid or on error
 #[no_mangle]
 pub unsafe extern "C" fn ocx_vdf_verify(
+    receipt_hash: *const u8,
+    proof: *const OcxVdfProof,
+) -> bool {
+    // Prevent panics from unwinding across the FFI boundary (undefined behavior).
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        ocx_vdf_verify_inner(receipt_hash, proof)
+    })) {
+        Ok(result) => result,
+        Err(_) => false,
+    }
+}
+
+unsafe fn ocx_vdf_verify_inner(
     receipt_hash: *const u8,
     proof: *const OcxVdfProof,
 ) -> bool {

@@ -244,9 +244,14 @@ func NewServer() (*Server, error) {
 		log.Printf("VDF temporal proofs enabled")
 	}
 	if iterStr := os.Getenv("OCX_VDF_ITERATIONS"); iterStr != "" {
-		if iter, err := strconv.ParseUint(iterStr, 10, 64); err == nil {
-			vdfCfg.Iterations = iter
+		iter, err := strconv.ParseUint(iterStr, 10, 64)
+		if err != nil {
+			log.Fatalf("Invalid OCX_VDF_ITERATIONS=%q: %v", iterStr, err)
 		}
+		if iter < 1000 || iter > 10_000_000 {
+			log.Fatalf("OCX_VDF_ITERATIONS=%d out of bounds [1000, 10000000]", iter)
+		}
+		vdfCfg.Iterations = iter
 	}
 	if modID := os.Getenv("OCX_VDF_MODULUS_ID"); modID != "" {
 		vdfCfg.ModulusID = modID
@@ -323,17 +328,30 @@ func (s *Server) handleVerify(w http.ResponseWriter, r *http.Request) {
 	vdfVerified := false
 	extras["vdf_present"] = vdfPresent
 	if vdfPresent {
-		vdfProof := &vdf.Proof{
-			Output:     full.Core.VdfOutput,
-			Proof:      full.Core.VdfProof,
-			Iterations: full.Core.VdfIter,
-			ModulusID:  full.Core.VdfModulusID,
+		// CRITICAL: The VDF challenge was computed from the core BEFORE VDF fields
+		// were added (keys 1-11 only). We must strip VDF fields to get the same hash.
+		preVdfCore := full.Core
+		preVdfCore.VdfOutput = nil
+		preVdfCore.VdfProof = nil
+		preVdfCore.VdfIter = 0
+		preVdfCore.VdfModulusID = ""
+		preVdfCoreBytes, err := receipt.CanonicalizeCore(&preVdfCore)
+		if err != nil {
+			log.Printf("Warning: Failed to canonicalize pre-VDF core: %v", err)
+		} else {
+			vdfChallengeHash := sha256.Sum256(preVdfCoreBytes)
+			vdfProof := &vdf.Proof{
+				Output:     full.Core.VdfOutput,
+				Proof:      full.Core.VdfProof,
+				Iterations: full.Core.VdfIter,
+				ModulusID:  full.Core.VdfModulusID,
+			}
+			valid, vdfErr := vdf.Verify(vdfChallengeHash, vdfProof)
+			if vdfErr != nil {
+				log.Printf("Warning: VDF verification error: %v", vdfErr)
+			}
+			vdfVerified = vdfErr == nil && valid
 		}
-		valid, vdfErr := vdf.Verify(coreHash, vdfProof)
-		if vdfErr != nil {
-			log.Printf("Warning: VDF verification error: %v", vdfErr)
-		}
-		vdfVerified = vdfErr == nil && valid
 		extras["vdf_verified"] = vdfVerified
 		extras["vdf_iterations"] = full.Core.VdfIter
 	}

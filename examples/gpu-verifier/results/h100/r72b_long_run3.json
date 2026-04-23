@@ -1,0 +1,19 @@
+{
+  "model": "Qwen/Qwen2.5-72B-Instruct",
+  "prompt": "Write a short poem about deterministic computation, exactly 4 lines. Just the poem:",
+  "seed": 42,
+  "generated_text": " no titles, no author names.\nIn circuits of logic, where paths are clear and defined,\nEach step follows the last, in order, aligned.\nNo room for chance, in this world so constrained,\nEvery output, a consequence, precisely maintained.",
+  "num_generated_tokens": 51,
+  "elapsed_s": 471.308,
+  "logits_hash_hex": "3b5d592bf679e95d70c684200895104c0359d84a510e6f1f6aa5cb4fa2bcb336",
+  "output_hash_hex": "e59fca7d92175e79cd361621a228db5dbb45184cade56183d1313b1aeefd016e",
+  "input_hash_hex": "7d023e65e354d2cbaee90009f5d5f7b09b339d1ddc46561008de3a4f5e5d9a98",
+  "program_hash_hex": "03594e1632d3b4b973232362ba4f8f7d777be966073e23318ab105e9ff2d2a54",
+  "signature_hex": "76da3f692582c4a1aefc10cb0888ae044ba5078f113e55da8dac446e2750f153d69c91c619fa8fc580d208bc57366a1331b6e6f8e388e65dc5c4054fcbb85d01",
+  "public_key_hex": "a2de500094783bfa5e369741cacfeded680c67abb5d2110b2dd76607470ec82b",
+  "receipt_cbor_hex": "a801582003594e1632d3b4b973232362ba4f8f7d777be966073e23318ab105e9ff2d2a540258207d023e65e354d2cbaee90009f5d5f7b09b339d1ddc46561008de3a4f5e5d9a98035820e59fca7d92175e79cd361621a228db5dbb45184cade56183d1313b1aeefd016e041901d9051a69ea6477061a69ea664f07736f63782d6770752d76657269666965722d763008584076da3f692582c4a1aefc10cb0888ae044ba5078f113e55da8dac446e2750f153d69c91c619fa8fc580d208bc57366a1331b6e6f8e388e65dc5c4054fcbb85d01",
+  "receipt_len_bytes": 210,
+  "verify_ok": true,
+  "verify_error": "OCX_SUCCESS",
+  "verify_elapsed_us": 738.55
+}

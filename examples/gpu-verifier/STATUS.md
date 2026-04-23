@@ -137,11 +137,14 @@ Qwen 2.5-72B-Instruct, bf16, device_map="auto" (80GB GPU + 55GB CPU), long-gen 1
   logits_hash : 3b5d592bf679e95d70c684200895104c0359d84a510e6f1f6aa5cb4fa2bcb336
 ```
 
-Saved receipt artifacts in `results/h100/`:
-- `r72b_long_run1.{cbor,json}` — 72B long-gen, first fresh process
-- `r72b_long_run2.{cbor,json}` — 72B long-gen, second fresh process (byte-identical to run 1)
+Saved receipt artifacts in `results/h100/` (three fresh-process runs of the 72B long-gen test):
+- `r72b_long_run1.json` + `.cbor` — first fresh process, 462s inference, OCX_SUCCESS 789μs
+- `r72b_long_run2.json` — second fresh process, 491s inference, OCX_SUCCESS 761μs
+- `r72b_long_run3.json` — third fresh process, 471s inference, OCX_SUCCESS 739μs
 
-Across all H100 tests: **three fresh Python subprocesses produce byte-identical output_hash AND logits_hash within a single GPU**. That's the deterministic-GPU-inference claim proven at frontier scale.
+All three: byte-identical output_hash, byte-identical logits_hash, identical generated text. Three fresh Python processes, each cold-starting and reloading 135GB of weights from disk, producing bit-identical inference results.
+
+Across all H100 tests: **three fresh Python subprocesses produce byte-identical output_hash AND logits_hash within a single GPU, at scales from 0.5B up through 72B (including CPU-offloaded frontier scale)**. The deterministic-GPU-inference claim is proven, with committed receipt artifacts that any third party can re-verify offline through the canonical Rust `libocx-verify` library.
 
 ---
 

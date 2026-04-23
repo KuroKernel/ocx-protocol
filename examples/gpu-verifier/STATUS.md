@@ -12,6 +12,7 @@
 **Also verified tonight:**
 - Determinism holds **without** `CUDA_LAUNCH_BLOCKING=1` (async kernel launches are fine for this workload at 0.5B).
 - Determinism holds at **bf16** with the same output text and byte-identical logits across processes — VRAM halved vs fp32 without losing the guarantee.
+- Determinism holds at **Qwen 2.5-3B-Instruct** (6x parameter count jump from 0.5B), both short (2 tokens) and long (128 tokens) generations, bf16 on the same 5060 — byte-identical output and logits across three fresh processes.
 
 All three success criteria from the plan passed on first run:
 
@@ -79,7 +80,24 @@ wall_per_process    : ~7.0 s  (~15% faster than fp32)
 vram_used           : ~1 GB (halved vs fp32's ~2 GB)
 ```
 
-Receipt size is 208 bytes CBOR regardless of dtype. Verify latency is ~80 μs median. Any verifier matching the environment + flags above and running `test_determinism_gpu.py --dtype {fp32|bf16}` should reproduce the corresponding `output_hash` and `logits_hash` exactly.
+**Qwen 2.5-3B-Instruct, bfloat16, eager attention, async launches (Day 4 pivot):**
+```
+prompt            : "What is the capital of France? Answer in one word:"
+output_hash       : 4b0172770a954fd2c8e4bf53e6d053e484ae2710b2b7728da45f49e112a31903
+logits_hash       : 272aa759af0f2a9217edc308c860ab5e3d0cf7d9942772bb0d9e5e6f37b1c14b
+generated_text    : " Paris."  (2 tokens, hits EOS fast)
+wall_per_process  : ~14 s  (dominated by model load — 6GB checkpoint)
+
+Long-generation variant, same model + flags, 128 max tokens:
+prompt            : "Write a short poem about deterministic computation, exactly 4 lines..."
+output_hash       : c2eaa81c9f6f4a2e5097c0ee020a8e1f06cd72b46650170f879816eaa0c7748d
+logits_hash       : 4fbc8eccecd84f58f350b683cb746fb18cb58cba49e680c315f1ae37246d5b8a
+generated_text    : "Bits dance in circuits' embrace, / Determinism's path they trace. /
+                     Logic's cold hand guides each step, / Numbers sing to final sleep."
+                    (identical across all 3 fresh processes, all 128 tokens)
+```
+
+Receipt size is 208 bytes CBOR regardless of dtype or model. Verify latency is ~80 μs median. Any verifier matching the environment + flags above and running `test_determinism_gpu.py --dtype {fp32|bf16} --model {model}` should reproduce the corresponding `output_hash` and `logits_hash` exactly.
 
 ---
 
@@ -90,8 +108,16 @@ Being precise about the boundary of the claim:
 ### 2.1 Cross-GPU determinism (untested)
 We only have one RTX 5060. **We have not tested** whether two different 5060s produce the same logits. Even within the same GPU arch, driver version, firmware version, and thermal/clock state can introduce tiny timing differences that occasionally affect kernel scheduling. Based on the CPU x86↔ARM experience (see `examples/ai-verifier/STATUS.md`), expect that cross-vendor cross-arch is almost certainly not byte-identical. Cross-vendor same-arch (two 5060s on two different machines) is the interesting measurement. Not done tonight.
 
-### 2.2 Model scale (limited)
-Qwen 2.5-0.5B is a toy. Only 290 weight tensors. Tiny hidden dim. Determinism here does not imply determinism at 7B, 13B, or 70B — numerical margins get tighter at scale and the argmax flip risk grows. 7B on 5060 (quantized) is the Day-4 milestone. 70B on H100 is the Day-6 milestone. Neither done.
+### 2.2 Model scale (partially tested)
+Confirmed deterministic at 0.5B AND 3B on this 5060. Not yet tested at 7B, 13B, or 70B.
+
+**Day 4 blocker on 7B on this machine:** quantization libraries (`auto-gptq`, `gptqmodel`, `autoawq`) all fail to build against `torch 2.12.0.dev20260408+cu128` (the only PyTorch that supports Blackwell sm_120). Qwen 2.5-7B unquantized in bf16 is 15GB — doesn't fit 8GB 5060 VRAM without quantization. On-GPU 7B testing on this specific 5060 + nightly-torch combo is thus blocked until either:
+- PyTorch stable releases with sm_120 support and the quant lib ecosystem catches up, OR
+- We rent cloud GPU with stable CUDA 12.1-12.4 and pre-built quant lib stacks (next Day-5 step).
+
+This blocker is expected — the plan explicitly called it out as Risk 4 ("7B bitsandbytes 4-bit kernels nondeterministic on 5060, 60% likely"). The specific failure mode was different (install, not determinism) but the resolution is the same: H100 rental with known-good stack.
+
+Determinism scaling from 0.5B → 3B without any argmax flip, both short and long generations, is nevertheless a strong signal that the primitive generalizes across model sizes on a single GPU. Going from 3B to 70B is ~20x parameter count. The CPU ai-verifier showed determinism holds at 7B on x86 (same scale jump). Expectation is it will hold at 70B on H100 too; measurement pending.
 
 ### 2.3 Flash Attention (untested)
 The demo uses `attn_implementation="eager"` (vanilla attention). This materializes the full `[L, L]` attention score matrix and is memory-infeasible at 70B (a single 70B forward pass at L=2048 would need ~40GB just for attention scores). Frontier-scale requires Flash Attention v2 with `deterministic=True`. FA2 was NOT tested tonight. Whether `deterministic=True` holds byte-identity across fresh processes on Blackwell is an open question.

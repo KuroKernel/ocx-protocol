@@ -27,7 +27,13 @@ SCRIPT = Path(__file__).resolve().parent / "ocx_gpu_verifier.py"
 PY = sys.executable  # same interpreter as this process
 
 
-def run_once(prompt: str, seed: int, max_new_tokens: int) -> dict:
+def run_once(
+    prompt: str,
+    seed: int,
+    max_new_tokens: int,
+    dtype: str = "float32",
+    attn: str = "eager",
+) -> dict:
     """Spawn a fresh subprocess of ocx_gpu_verifier.py --once and parse JSON."""
     out = subprocess.run(
         [
@@ -36,6 +42,8 @@ def run_once(prompt: str, seed: int, max_new_tokens: int) -> dict:
             "--prompt", prompt,
             "--seed", str(seed),
             "--max-new-tokens", str(max_new_tokens),
+            "--dtype", dtype,
+            "--attn", attn,
         ],
         capture_output=True,
         text=True,
@@ -51,17 +59,26 @@ def run_once(prompt: str, seed: int, max_new_tokens: int) -> dict:
     return json.loads(lines[-1])
 
 
-def test_determinism(prompt: str, seed: int, max_new_tokens: int, n: int) -> bool:
+def test_determinism(
+    prompt: str,
+    seed: int,
+    max_new_tokens: int,
+    n: int,
+    dtype: str = "float32",
+    attn: str = "eager",
+) -> bool:
     print(f"Running {n} fresh subprocesses of ocx_gpu_verifier.py...")
     print(f"  prompt      : {prompt!r}")
     print(f"  seed        : {seed}")
     print(f"  max_new     : {max_new_tokens}")
+    print(f"  dtype       : {dtype}")
+    print(f"  attn        : {attn}")
     print()
 
     runs = []
     for i in range(n):
         t0 = time.perf_counter()
-        r = run_once(prompt, seed, max_new_tokens)
+        r = run_once(prompt, seed, max_new_tokens, dtype=dtype, attn=attn)
         elapsed = time.perf_counter() - t0
         print(
             f"  run {i+1}: output={r['output_hash_hex'][:16]}... "
@@ -192,6 +209,8 @@ def main() -> int:
     parser.add_argument("--max-new-tokens", type=int, default=64)
     parser.add_argument("--runs", type=int, default=3, help="Number of fresh subprocesses for determinism test")
     parser.add_argument("--bench-n", type=int, default=100, help="Number of receipts for verify bench")
+    parser.add_argument("--dtype", default="float32", help="Model dtype for determinism test")
+    parser.add_argument("--attn", default="eager", help="Attention implementation")
     args = parser.parse_args()
 
     overall = True
@@ -200,7 +219,10 @@ def main() -> int:
         print("=" * 70)
         print("TEST 1/2 — DETERMINISM (S1)")
         print("=" * 70)
-        overall &= test_determinism(args.prompt, args.seed, args.max_new_tokens, args.runs)
+        overall &= test_determinism(
+            args.prompt, args.seed, args.max_new_tokens, args.runs,
+            dtype=args.dtype, attn=args.attn,
+        )
         print()
 
     if args.mode in ("all", "verify"):

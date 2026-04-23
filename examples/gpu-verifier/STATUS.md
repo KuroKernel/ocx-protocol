@@ -9,6 +9,10 @@
 
 **Deterministic GPU inference of Qwen 2.5-0.5B on an RTX 5060 Blackwell (sm_120), with canonical OCX receipts that verify offline via the Rust `libocx-verify` shared library in ~80 microseconds, tamper-detectable by a one-bit flip.**
 
+**Also verified tonight:**
+- Determinism holds **without** `CUDA_LAUNCH_BLOCKING=1` (async kernel launches are fine for this workload at 0.5B).
+- Determinism holds at **bf16** with the same output text and byte-identical logits across processes — VRAM halved vs fp32 without losing the guarantee.
+
 All three success criteria from the plan passed on first run:
 
 | Criterion | Target | Measured | Result |
@@ -46,24 +50,36 @@ Everything that makes PyTorch reproducible, turned on:
 - Model loaded as `torch_dtype=torch.float32, attn_implementation="eager"` (no Flash Attention)
 - Greedy decoding (`do_sample=False, temperature=0.0, num_beams=1`)
 
-### Canonical baseline (reproducible)
+### Canonical baselines (reproducible)
 
+**float32, eager attention, CUDA_LAUNCH_BLOCKING=1 (original configuration):**
 ```
 prompt              : "What is the capital of France? Answer in one word:"
 max_new_tokens      : 64
 seed                : 42
 generated_text      : " Paris. The capital of France is Paris."
 tokens              : 10
-inference_latency   : ~810 ms per fresh process
-program_hash        : 8f67cfdd66abbd1338639c042c2d9c645fa717f20899e89c59abc487707b6aed
-input_hash          : 3c431e223966a26412fae474e84da6cf2d43a06f8ae987d64d0c0101d135e863
+wall_per_process    : ~8.2 s
 output_hash         : 0fbfb8ecf647e1758a0af6cca95e6e3a086f9d82e958ec85ee7d4422cf31cfa7
 logits_hash         : a0d69f041d1a82f082328c17aa14913c25a5957a331761e86e660de41f94696c
-receipt_cbor_size   : 208 bytes
-verify_latency_p99  : 291 μs (Rust libocx-verify via ctypes)
 ```
 
-Any verifier matching the environment above and running `test_determinism_gpu.py` should reproduce the `output_hash` and `logits_hash` exactly.
+**float32, eager attention, CUDA_LAUNCH_BLOCKING=0 (Day 2):**
+```
+output_hash         : 0fbfb8ecf647e1758a0af6cca95e6e3a086f9d82e958ec85ee7d4422cf31cfa7  (identical)
+logits_hash         : a0d69f041d1a82f082328c17aa14913c25a5957a331761e86e660de41f94696c  (identical)
+wall_per_process    : ~8.2 s  (dominated by model load at 0.5B, not inference)
+```
+
+**bfloat16, eager attention, CUDA_LAUNCH_BLOCKING=1 (Day 3):**
+```
+output_hash         : 0fbfb8ecf647e1758a0af6cca95e6e3a086f9d82e958ec85ee7d4422cf31cfa7  (identical text!)
+logits_hash         : 054ccb46301149dc9371da7f369d27f83c8a338fc3b3f451e06c115930ea0949  (differs — different dtype)
+wall_per_process    : ~7.0 s  (~15% faster than fp32)
+vram_used           : ~1 GB (halved vs fp32's ~2 GB)
+```
+
+Receipt size is 208 bytes CBOR regardless of dtype. Verify latency is ~80 μs median. Any verifier matching the environment + flags above and running `test_determinism_gpu.py --dtype {fp32|bf16}` should reproduce the corresponding `output_hash` and `logits_hash` exactly.
 
 ---
 
@@ -83,12 +99,12 @@ The demo uses `attn_implementation="eager"` (vanilla attention). This materializ
 ### 2.4 Quantization (untested)
 Currently using float32, which is the largest and slowest format but the most numerically robust for determinism testing. bf16 (half memory, 0.5B at bf16 ≈ 1GB) is Day-3. 4-bit quantization via GPTQ or bitsandbytes is Day-4. The concern: bitsandbytes 4-bit kernels use atomicAdd and are not on the `use_deterministic_algorithms` allowlist.
 
-### 2.5 Perf (unoptimized by design)
-`CUDA_LAUNCH_BLOCKING=1` serializes every kernel launch. With float32 + eager attention + fresh-process load overhead, fresh-process wall time is ~8.5s of which ~7.5s is model load and ~1s is inference. Real deployment needs:
-- `CUDA_LAUNCH_BLOCKING=0` (need to confirm determinism holds)
-- Warm model pooled across requests
-- bf16 or lower precision
-These are Week-1 experiments, not tonight.
+### 2.5 Perf (partially optimized after Day 2 + Day 3)
+`CUDA_LAUNCH_BLOCKING=1` serializes every kernel launch. We confirmed Day 2 that `CUDA_LAUNCH_BLOCKING=0` keeps determinism intact at 0.5B, so async launches are now the default. At 0.5B the perf delta is invisible (model load dominates the 8.2s wall time), but at 7B and 70B this will matter a lot.
+bf16 (Day 3) further halved VRAM and cut wall time ~15% without losing determinism. Still pending:
+- Warm model pooled across requests (infra work, not research)
+- fp16 path (likely similar to bf16 but with different numerical characteristics)
+- Flash Attention v2 with `deterministic=True` (required at 70B)
 
 ### 2.6 Environment field on receipt (not yet implemented)
 STRATEGY.md Path 4 proposes `environment` in the receipt itself — arch, driver, CUDA, torch, GPU UUID, model SHA. Right now we capture those via `env_spec.py` but they go only into `host_info` (unsigned metadata). Promoting them to a signed receipt field is a schema change across Go + Rust + Python. Not done tonight; Week-1 work.

@@ -17,10 +17,10 @@ from __future__ import annotations
 import os
 
 os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
-# CUDA_LAUNCH_BLOCKING=1 serializes kernel launches. Slower, but eliminates
-# one source of nondeterminism. Drop this for Day 2 perf once we have a
-# passing baseline.
-os.environ.setdefault("CUDA_LAUNCH_BLOCKING", "1")
+# Day 2 verified determinism holds WITHOUT kernel-launch serialization at 0.5B.
+# Default is now async (much faster). Override to "1" if suspect async reordering
+# is causing a nondeterminism bug at scale.
+os.environ.setdefault("CUDA_LAUNCH_BLOCKING", "0")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 # --- Imports ---------------------------------------------------------------
@@ -45,9 +45,20 @@ DEFAULT_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
 DEFAULT_PROMPT = "What is the capital of France? Answer in one word:"
 DEFAULT_SEED = 42
 DEFAULT_MAX_NEW_TOKENS = 64
+DEFAULT_DTYPE = "float32"
+DEFAULT_ATTN = "eager"
 ISSUER_ID = "ocx-gpu-verifier-v0"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RECEIPTS_DIR = Path(__file__).resolve().parent / "receipts"
+
+_DTYPE_MAP = {
+    "float32": torch.float32,
+    "fp32": torch.float32,
+    "bfloat16": torch.bfloat16,
+    "bf16": torch.bfloat16,
+    "float16": torch.float16,
+    "fp16": torch.float16,
+}
 
 
 # --- Helpers ---------------------------------------------------------------
@@ -71,27 +82,39 @@ def sha256_bytes(data: bytes) -> bytes:
 def model_hash(model: torch.nn.Module) -> bytes:
     """SHA256 of concatenated parameter tensors in a fixed order.
 
-    This is a CPU-side deterministic fingerprint of the loaded weights.
-    It is NOT the same as the safetensors file hash, but is reproducible
-    given the same HF checkpoint loaded with the same dtype.
+    Dtype-agnostic: hashes the raw memory representation via a uint8 view,
+    so bfloat16 / float16 / float32 all work. This is a CPU-side
+    deterministic fingerprint; NOT the same as the safetensors file hash.
     """
     h = hashlib.sha256()
     for name, p in sorted(model.state_dict().items()):
         h.update(name.encode())
-        # Move to CPU + contiguous + bytes view for stable hashing.
-        h.update(p.detach().cpu().contiguous().numpy().tobytes())
+        # .view(torch.uint8) gives the raw bytes regardless of dtype. numpy
+        # supports uint8 for all tensor shapes.
+        tensor = p.detach().cpu().contiguous()
+        raw = tensor.view(torch.uint8).numpy().tobytes()
+        h.update(raw)
     return h.digest()
 
 
-def load_model(model_name: str, seed: int) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
+def load_model(
+    model_name: str,
+    seed: int,
+    dtype: str = DEFAULT_DTYPE,
+    attn_impl: str = DEFAULT_ATTN,
+) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
     """Load tokenizer + model in deterministic configuration on GPU."""
     configure_determinism(seed)
+
+    torch_dtype = _DTYPE_MAP.get(dtype.lower())
+    if torch_dtype is None:
+        raise ValueError(f"unknown dtype {dtype!r}; valid: {list(_DTYPE_MAP)}")
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=torch.float32,
-        attn_implementation="eager",   # vanilla attention, no Flash
+        torch_dtype=torch_dtype,
+        attn_implementation=attn_impl,
         device_map={"": "cuda:0"},
     )
     model.eval()
@@ -136,9 +159,11 @@ def run_inference(
     generated_ids_bytes = generated_ids.cpu().numpy().tobytes()
 
     # Logits at every position, concatenated + hashed. More sensitive
-    # nondeterminism detector than token-level argmax.
-    logits = torch.stack(list(output.logits), dim=0).cpu().numpy().tobytes()
-    logits_hash = sha256_bytes(logits)
+    # nondeterminism detector than token-level argmax. Hash via uint8 view
+    # to be dtype-agnostic (bf16/fp16/fp32 all work).
+    logits_tensor = torch.stack(list(output.logits), dim=0).cpu().contiguous()
+    logits_bytes = logits_tensor.view(torch.uint8).numpy().tobytes()
+    logits_hash = sha256_bytes(logits_bytes)
 
     # Output hash = sha256(generated token ids || decoded text bytes).
     # token ids are the deterministic surface (text is a decode of them).
@@ -196,6 +221,18 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--max-new-tokens", type=int, default=DEFAULT_MAX_NEW_TOKENS)
     parser.add_argument(
+        "--dtype",
+        default=DEFAULT_DTYPE,
+        choices=list(_DTYPE_MAP.keys()),
+        help="Model/activation dtype. Default float32 for max numerical robustness.",
+    )
+    parser.add_argument(
+        "--attn",
+        default=DEFAULT_ATTN,
+        choices=["eager", "sdpa", "flash_attention_2"],
+        help="Attention implementation. 'eager' is vanilla (safest for determinism).",
+    )
+    parser.add_argument(
         "--once",
         action="store_true",
         help="Only print a machine-readable JSON line to stdout (for cross-process tests)",
@@ -241,7 +278,7 @@ def main() -> int:
     pubkey_raw = raw_public_key(signer.public_key())
 
     # Load model
-    model, tokenizer = load_model(args.model, args.seed)
+    model, tokenizer = load_model(args.model, args.seed, dtype=args.dtype, attn_impl=args.attn)
     m_hash = model_hash(model)
 
     # Run inference

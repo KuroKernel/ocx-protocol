@@ -34,6 +34,7 @@ def run_once(
     dtype: str = "float32",
     attn: str = "eager",
     model: str | None = None,
+    device_map: str = "cuda:0",
 ) -> dict:
     """Spawn a fresh subprocess of ocx_gpu_verifier.py --once and parse JSON."""
     cmd = [
@@ -44,6 +45,7 @@ def run_once(
         "--max-new-tokens", str(max_new_tokens),
         "--dtype", dtype,
         "--attn", attn,
+        "--device-map", device_map,
     ]
     if model:
         cmd += ["--model", model]
@@ -66,6 +68,7 @@ def test_determinism(
     dtype: str = "float32",
     attn: str = "eager",
     model: str | None = None,
+    device_map: str = "cuda:0",
 ) -> bool:
     print(f"Running {n} fresh subprocesses of ocx_gpu_verifier.py...")
     print(f"  model       : {model or '(default)'}")
@@ -74,12 +77,13 @@ def test_determinism(
     print(f"  max_new     : {max_new_tokens}")
     print(f"  dtype       : {dtype}")
     print(f"  attn        : {attn}")
+    print(f"  device_map  : {device_map}")
     print()
 
     runs = []
     for i in range(n):
         t0 = time.perf_counter()
-        r = run_once(prompt, seed, max_new_tokens, dtype=dtype, attn=attn, model=model)
+        r = run_once(prompt, seed, max_new_tokens, dtype=dtype, attn=attn, model=model, device_map=device_map)
         elapsed = time.perf_counter() - t0
         print(
             f"  run {i+1}: output={r['output_hash_hex'][:16]}... "
@@ -213,6 +217,7 @@ def main() -> int:
     parser.add_argument("--dtype", default="float32", help="Model dtype for determinism test")
     parser.add_argument("--attn", default="eager", help="Attention implementation")
     parser.add_argument("--model", default=None, help="HF model id (default: Qwen2.5-0.5B-Instruct)")
+    parser.add_argument("--device-map", default="cuda:0", help="'cuda:0' pins to GPU; 'auto' offloads to CPU RAM (needed for >80GB models)")
     args = parser.parse_args()
 
     overall = True
@@ -223,7 +228,7 @@ def main() -> int:
         print("=" * 70)
         overall &= test_determinism(
             args.prompt, args.seed, args.max_new_tokens, args.runs,
-            dtype=args.dtype, attn=args.attn, model=args.model,
+            dtype=args.dtype, attn=args.attn, model=args.model, device_map=args.device_map,
         )
         print()
 

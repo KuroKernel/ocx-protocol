@@ -5,3 +5,6 @@ receipts/
 __pycache__/
 *.pyc
 parity/dump_canonical
+# Persisted test artifacts (results/ is committed for the record)
+!results/**/*.cbor
+!results/**/*.json

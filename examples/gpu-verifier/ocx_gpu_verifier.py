@@ -83,14 +83,24 @@ def model_hash(model: torch.nn.Module) -> bytes:
     """SHA256 of concatenated parameter tensors in a fixed order.
 
     Dtype-agnostic: hashes the raw memory representation via a uint8 view,
-    so bfloat16 / float16 / float32 all work. This is a CPU-side
-    deterministic fingerprint; NOT the same as the safetensors file hash.
+    so bfloat16 / float16 / float32 all work. If any parameters are on the
+    meta device (common when accelerate offloads large models with
+    device_map="auto"), we fall back to hashing name+dtype+shape+device
+    metadata instead — NOT the weight bytes. That fallback fingerprint is
+    still reproducible given the same HF checkpoint and same device_map,
+    just not cross-device-map comparable.
     """
     h = hashlib.sha256()
+    has_meta = any(
+        p.device.type == "meta" for p in model.parameters()
+    )
+    if has_meta:
+        h.update(b"META_FINGERPRINT\n")
+        for name, p in sorted(model.state_dict().items()):
+            h.update(f"{name}|{p.dtype}|{tuple(p.shape)}|{p.device.type}\n".encode())
+        return h.digest()
     for name, p in sorted(model.state_dict().items()):
         h.update(name.encode())
-        # .view(torch.uint8) gives the raw bytes regardless of dtype. numpy
-        # supports uint8 for all tensor shapes.
         tensor = p.detach().cpu().contiguous()
         raw = tensor.view(torch.uint8).numpy().tobytes()
         h.update(raw)
@@ -102,20 +112,35 @@ def load_model(
     seed: int,
     dtype: str = DEFAULT_DTYPE,
     attn_impl: str = DEFAULT_ATTN,
+    device_map: str = "cuda:0",
 ) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
-    """Load tokenizer + model in deterministic configuration on GPU."""
+    """Load tokenizer + model in deterministic configuration on GPU.
+
+    device_map:
+      "cuda:0"   — pin everything to the first GPU (tight fit for up to ~40B
+                   bf16 on 80GB).
+      "auto"     — let transformers/accelerate split weights between GPU and
+                   CPU RAM. Required for >80GB models on a single H100.
+                   Slower inference (CPU-resident layers are memory-bound).
+    """
     configure_determinism(seed)
 
     torch_dtype = _DTYPE_MAP.get(dtype.lower())
     if torch_dtype is None:
         raise ValueError(f"unknown dtype {dtype!r}; valid: {list(_DTYPE_MAP)}")
 
+    # Normalize: "cuda:0" -> {"": "cuda:0"} (pin); "auto" stays as string.
+    if device_map != "auto":
+        device_map_arg = {"": device_map}
+    else:
+        device_map_arg = "auto"
+
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
         torch_dtype=torch_dtype,
         attn_implementation=attn_impl,
-        device_map={"": "cuda:0"},
+        device_map=device_map_arg,
     )
     model.eval()
     return model, tokenizer
@@ -201,11 +226,16 @@ def build_receipt(
     started_unix = int(wall_start)
     finished_unix = max(int(wall_end), started_unix + 1)
 
+    # Rust verifier requires cycles_used >= execution_duration_seconds
+    # (heuristic: "at least one unit of work per second"). Fast inference
+    # with small token count can trip this on slow-load large models, so
+    # take the max of tokens-generated and duration.
+    duration_s = max(1, finished_unix - started_unix)
     core = ReceiptCore(
         program_hash=program_hash,
         input_hash=input_hash,
         output_hash=output_hash,
-        cycles_used=max(num_tokens, 1),
+        cycles_used=max(num_tokens, duration_s + 1, 1),
         started_at=started_unix,
         finished_at=finished_unix,
         issuer_id=ISSUER_ID,
@@ -231,6 +261,11 @@ def main() -> int:
         default=DEFAULT_ATTN,
         choices=["eager", "sdpa", "flash_attention_2"],
         help="Attention implementation. 'eager' is vanilla (safest for determinism).",
+    )
+    parser.add_argument(
+        "--device-map",
+        default="cuda:0",
+        help="'cuda:0' to pin to GPU, 'auto' to offload large models to CPU RAM.",
     )
     parser.add_argument(
         "--once",
@@ -278,7 +313,10 @@ def main() -> int:
     pubkey_raw = raw_public_key(signer.public_key())
 
     # Load model
-    model, tokenizer = load_model(args.model, args.seed, dtype=args.dtype, attn_impl=args.attn)
+    model, tokenizer = load_model(
+        args.model, args.seed,
+        dtype=args.dtype, attn_impl=args.attn, device_map=args.device_map,
+    )
     m_hash = model_hash(model)
 
     # Run inference

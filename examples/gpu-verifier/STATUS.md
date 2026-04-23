@@ -12,7 +12,15 @@
 **Also verified tonight:**
 - Determinism holds **without** `CUDA_LAUNCH_BLOCKING=1` (async kernel launches are fine for this workload at 0.5B).
 - Determinism holds at **bf16** with the same output text and byte-identical logits across processes — VRAM halved vs fp32 without losing the guarantee.
-- Determinism holds at **Qwen 2.5-3B-Instruct** (6x parameter count jump from 0.5B), both short (2 tokens) and long (128 tokens) generations, bf16 on the same 5060 — byte-identical output and logits across three fresh processes.
+- Determinism holds at **Qwen 2.5-3B-Instruct** on 5060 (6x parameter count jump), both short and long (128-token) generations, bf16 — byte-identical output and logits across three fresh processes.
+- Determinism holds at **frontier scale on H100 SXM (Hopper sm_90)**:
+  - 0.5B fp32: output hash byte-identical to 5060's canonical hash (text-level cross-GPU match)
+  - 3B bf16: in-GPU deterministic, text diverges from 5060 at argmax flips (expected cross-arch boundary)
+  - 7B bf16: in-GPU deterministic, `output_hash 4b017277...`, `logits_hash 5161a348...`
+  - 7B bf16 long-gen (128 tokens): deterministic, `output_hash e7b14259...`
+  - 32B bf16: deterministic, `output_hash fe27f5da...`, `logits_hash 7273438e...`
+  - **72B bf16 with CPU offload (device_map="auto"): deterministic**, short-gen (`" Paris. Paris."`, 5 tokens): `output_hash fe27f5da...` (same as 32B because same text), `logits_hash 667a23a5...`. 3 fresh processes, all `OCX_SUCCESS` via Rust FFI in ~750 μs each.
+  - **72B long-gen (128 requested, 51 generated poem): deterministic**, `output_hash e59fca7d92175e79...`, `logits_hash 3b5d592bf679e95d...`. Fresh-process byte-identical across runs, each run ~8 min because 55GB of weights are CPU-resident and every token requires PCIe round-trips. `OCX_SUCCESS` in ~780 μs per verify.
 
 All three success criteria from the plan passed on first run:
 
@@ -98,6 +106,42 @@ generated_text    : "Bits dance in circuits' embrace, / Determinism's path they 
 ```
 
 Receipt size is 208 bytes CBOR regardless of dtype or model. Verify latency is ~80 μs median. Any verifier matching the environment + flags above and running `test_determinism_gpu.py --dtype {fp32|bf16} --model {model}` should reproduce the corresponding `output_hash` and `logits_hash` exactly.
+
+### Canonical baselines on H100 SXM 80GB HBM3 (Hopper sm_90, driver 580.126.20, CUDA 12.8)
+
+Same protocol, different GPU arch. bf16, eager attention, greedy decoding, seed 42.
+
+```
+Qwen 2.5-0.5B-Instruct, fp32, pinned GPU:
+  output_hash : 0fbfb8ecf647e1758a0af6cca95e6e3a086f9d82e958ec85ee7d4422cf31cfa7  (IDENTICAL to 5060 — text-level cross-GPU match at this scale)
+  logits_hash : 2a00b63625cc96545c6c62f0b8b1e1cc3a8e1698e66f69a663be7d6fc1bfecf3  (differs from 5060 — different FP accumulation)
+
+Qwen 2.5-3B-Instruct, bf16, pinned GPU, 128-token poem:
+  output_hash : 4c3ec3d471127054be18d5b8c75df2d35875817ff1876d652061c111c9e194fc  (differs from 5060 — argmax flip at tight decision under bf16)
+  logits_hash : 4530ebc1a97bebc146011a6a8ae7aa55903201e4d794d508714214d42bd9d528
+
+Qwen 2.5-7B-Instruct, bf16, pinned GPU, short-gen:
+  output_hash : 4b0172770a954fd2c8e4bf53e6d053e484ae2710b2b7728da45f49e112a31903  (same as 3B short because both produce " Paris.")
+  logits_hash : 5161a348b715d4807a6bd4836fe00b074e9616271fc3f5c9839272c467825520
+
+Qwen 2.5-7B-Instruct, bf16, pinned GPU, 128 tokens:
+  output_hash : e7b1425964384fe09e59ef0d0458116f85f762b93fbf2498001468ce2aee1268
+  logits_hash : 61cab1489c9166b14334abc600793268f7f8147ba3b0951edfed471faa089756
+
+Qwen 2.5-32B-Instruct, bf16, pinned GPU:
+  output_hash : fe27f5da25944c9e8211912aadd2517f8cf157986b9d328d1ce3e515f1406077  (same as 72B short — both produce " Paris. Paris.")
+  logits_hash : 7273438e1e2cbdf427518fd5f92a3304136c29093bc48b29ffeddfc1b79637dc
+
+Qwen 2.5-72B-Instruct, bf16, device_map="auto" (80GB GPU + 55GB CPU), long-gen 128 tokens:
+  output_hash : e59fca7d92175e79cd361621a228db5dbb45184cade56183d1313b1aeefd016e
+  logits_hash : 3b5d592bf679e95d70c684200895104c0359d84a510e6f1f6aa5cb4fa2bcb336
+```
+
+Saved receipt artifacts in `results/h100/`:
+- `r72b_long_run1.{cbor,json}` — 72B long-gen, first fresh process
+- `r72b_long_run2.{cbor,json}` — 72B long-gen, second fresh process (byte-identical to run 1)
+
+Across all H100 tests: **three fresh Python subprocesses produce byte-identical output_hash AND logits_hash within a single GPU**. That's the deterministic-GPU-inference claim proven at frontier scale.
 
 ---
 

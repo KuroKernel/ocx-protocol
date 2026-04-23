@@ -57,10 +57,10 @@ class AIInferenceInput:
 
 @dataclass
 class AIInferenceOutput:
-    """What the AI produced."""
+    """What the AI produced. Only `response` is hashed — timing and token counts
+    are recorded as unhashed metadata so any third party can re-derive output_hash
+    from the response text alone."""
     response: str
-    tokens_generated: int
-    inference_time_ms: int
 
 @dataclass
 class OCXReceipt:
@@ -76,7 +76,7 @@ class OCXReceipt:
 
     # What was computed
     input_hash: str       # SHA256 of AIInferenceInput
-    output_hash: str      # SHA256 of AIInferenceOutput
+    output_hash: str      # SHA256 of {"response": text} — reproducible by any verifier
     model_hash: str       # SHA256 of model file (proves which model)
 
     # When it happened
@@ -86,12 +86,20 @@ class OCXReceipt:
     signature: str        # Ed25519 signature of canonical receipt
     public_key: str       # Public key for verification
 
+    # Unhashed metadata (informational only — not covered by signature)
+    response_text: str = ""
+    tokens_generated: int = 0
+    inference_time_ms: int = 0
+
     # Metadata
     version: str = "1.0"
 
     def to_canonical_bytes(self) -> bytes:
-        """Canonical serialization for signing/verification."""
-        # Sorted keys for determinism
+        """Canonical serialization for signing/verification.
+
+        Only the hash-covered fields are signed. response_text, tokens_generated,
+        and inference_time_ms are informational metadata and must NOT appear here,
+        otherwise non-deterministic timing would poison the signature."""
         data = {
             "input_hash": self.input_hash,
             "issuer_id": self.issuer_id,
@@ -229,13 +237,10 @@ class VerifiableAI:
         response_text = output['choices'][0]['text']
         tokens_generated = output['usage']['completion_tokens']
 
-        # Create output record
-        inference_output = AIInferenceOutput(
-            response=response_text,
-            tokens_generated=tokens_generated,
-            inference_time_ms=elapsed_ms
-        )
-        output_hash = sha256_json(asdict(inference_output))
+        # Output hash covers ONLY the response text (canonical JSON).
+        # Anyone with the response text can reproduce this hash — no timing or
+        # token counts in the hashed payload.
+        output_hash = sha256_json({"response": response_text})
 
         # Create receipt
         timestamp = datetime.now(timezone.utc).isoformat()
@@ -249,7 +254,10 @@ class VerifiableAI:
             model_hash=self.model_hash,
             timestamp=timestamp,
             signature="",  # Will be set below
-            public_key=self.signer.public_key_hex
+            public_key=self.signer.public_key_hex,
+            response_text=response_text,
+            tokens_generated=tokens_generated,
+            inference_time_ms=elapsed_ms,
         )
 
         # Sign the receipt
@@ -300,9 +308,11 @@ def verify_receipt(
     actual_input_hash = sha256_json(asdict(inference_input))
     results["input_hash_valid"] = (actual_input_hash == receipt.input_hash)
 
-    # 3. Verify output hash (we need to reconstruct - simplified check)
-    # In production, the full output record would be stored
-    results["output_hash_valid"] = True  # Simplified for demo
+    # 3. Verify output hash by re-deriving from the response text.
+    # With the fixed schema, output_hash = SHA256(canonical_json({"response": text})).
+    # Any third party holding the response can recompute and compare.
+    actual_output_hash = sha256_json({"response": response})
+    results["output_hash_valid"] = (actual_output_hash == receipt.output_hash)
 
     # 4. Verify signature
     if HAS_CRYPTO:

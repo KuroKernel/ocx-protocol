@@ -1,0 +1,28 @@
+{
+  "machine": "x86_64",
+  "processor": "x86_64",
+  "system": "Linux 6.12.10-76061203-generic",
+  "python": "3.10.12",
+  "model_path": "models/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+  "model_sha256": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+  "input_hash": "e4c73ea2b4ced9cd6c5781141732220dd75cd6ed30899a2c8274aeff03d3f45c",
+  "runs": [
+    {
+      "output_hash": "f6346a93756300aa4e9d6ce218c684d4a5c0293b425fbee0cf03405a627b87be",
+      "elapsed_ms": 2937,
+      "text_len": 419
+    },
+    {
+      "output_hash": "f6346a93756300aa4e9d6ce218c684d4a5c0293b425fbee0cf03405a627b87be",
+      "elapsed_ms": 3122,
+      "text_len": 419
+    },
+    {
+      "output_hash": "f6346a93756300aa4e9d6ce218c684d4a5c0293b425fbee0cf03405a627b87be",
+      "elapsed_ms": 2967,
+      "text_len": 419
+    }
+  ],
+  "canonical_output_hash": "f6346a93756300aa4e9d6ce218c684d4a5c0293b425fbee0cf03405a627b87be",
+  "in_process_deterministic": true
+}

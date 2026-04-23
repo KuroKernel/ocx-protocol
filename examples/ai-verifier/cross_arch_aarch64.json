@@ -1,0 +1,28 @@
+{
+  "machine": "aarch64",
+  "processor": "",
+  "system": "Linux 6.12.47+rpt-rpi-2712",
+  "python": "3.13.5",
+  "model_path": "models/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+  "model_sha256": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+  "input_hash": "e4c73ea2b4ced9cd6c5781141732220dd75cd6ed30899a2c8274aeff03d3f45c",
+  "runs": [
+    {
+      "output_hash": "668851688e97f38a6848de5a31095f14da70e36f4b9d0ff12c6458d6719359d2",
+      "elapsed_ms": 6572,
+      "text_len": 437
+    },
+    {
+      "output_hash": "668851688e97f38a6848de5a31095f14da70e36f4b9d0ff12c6458d6719359d2",
+      "elapsed_ms": 6565,
+      "text_len": 437
+    },
+    {
+      "output_hash": "668851688e97f38a6848de5a31095f14da70e36f4b9d0ff12c6458d6719359d2",
+      "elapsed_ms": 6568,
+      "text_len": 437
+    }
+  ],
+  "canonical_output_hash": "668851688e97f38a6848de5a31095f14da70e36f4b9d0ff12c6458d6719359d2",
+  "in_process_deterministic": true
+}

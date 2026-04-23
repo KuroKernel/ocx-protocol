@@ -17,16 +17,23 @@ We have a working proof-of-execution primitive for LLM inference. Given:
 - Deterministic sampling flags: `temperature=0`, `top_k=1`, `top_p=1.0`, `seed=42`, `n_threads=1`
 - CPU-only inference via `llama-cpp-python`
 
-...we produce a signed OCX receipt containing:
+...we produce a **canonical CBOR OCX receipt that round-trips through the Rust `libocx-verify` shared library** — the same verifier that the Go protocol server and any third party uses. The receipt contains:
 
 ```
+program_hash = SHA256(model file bytes)
 input_hash   = SHA256(canonical JSON of {prompt, model_hash, temperature, max_tokens, seed})
-model_hash   = SHA256(model file bytes)
 output_hash  = SHA256(canonical JSON of {response: text})   ← reproducible by any verifier
-signature    = Ed25519 signature over {input_hash, model_hash, output_hash, receipt_id, timestamp, issuer, version}
+signature    = Ed25519 over b"OCXv1|receipt|" + canonical_cbor({1: program_hash, 2: input_hash,
+               3: output_hash, 4: cycles_used, 5: started_at, 6: finished_at, 7: issuer_id})
 ```
 
-The key fix landed today: **output_hash is derived from the response text alone**, not from a payload that also contained `inference_time_ms` and `tokens_generated`. The old schema made output hashes unreproducible across runs, which defeated the point. A third party holding the response text can now recompute `output_hash` and compare.
+Two fixes landed today:
+
+1. **Schema fix (output_hash):** derived from the response text alone, not from a payload that also contained `inference_time_ms` and `tokens_generated`. The old schema made output hashes unreproducible across runs. A third party holding the response text can now recompute `output_hash` and compare.
+
+2. **Canonical pipeline fix (receipt signing):** the previous version signed a handwritten JSON payload with NO domain separator. Its receipts did not verify via the canonical `libocx-verify` Rust library; the demo self-verified through a handwritten Python path, which masked the gap. The new pipeline uses canonical CBOR matching `pkg/receipt/types.go:ReceiptCore` byte-for-byte, and Ed25519 signing with the protocol-required `OCXv1|receipt|` domain separator. Receipts now verify via `ocx_verify_receipt_detailed` through ctypes FFI into the pre-built `liblibocx_verify.so`.
+
+Result: the canonical baseline hashes below are the SAME values that were documented before the fix (the hash formulas were already correct; only the receipt wire format was wrong), but now they sit inside spec-compliant CBOR receipts that any third party verifier can check offline in under a millisecond.
 
 Evidence collected:
 
@@ -39,6 +46,7 @@ Evidence collected:
 | Cross-process determinism, 7B, long generation (96 tokens, 361 chars) | PASS — identical hash `813b8064f6be9964...` | `test_7b_long.py` |
 | Cross-architecture determinism, 0.5B (x86 vs ARM) | **FAIL** — common prefix 263 chars (~55 tokens), then argmax flip | See §2.1 |
 | Receipt signing + verification (after schema fix) | PASS — two fresh processes produce matching output_hash | `ocx_ai_verifier.py` |
+| Canonical round-trip: Python receipt → Rust libocx-verify (after canonical fix) | PASS — `OCX_SUCCESS` in ~350 μs, tamper-detectable | `ocx_ai_verifier.py` + `ffi_verify.py` |
 | Model file reproducibility | PASS — downloaded SHA256 matches repo exactly | `sha256sum` output |
 
 The canonical x86 hashes for the reference test (Qwen 0.5B, prompt `"What is the capital of France? Answer in one word:"`, max_tokens=100):

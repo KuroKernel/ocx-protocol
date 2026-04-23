@@ -163,9 +163,9 @@ Ordered by what most affects the primitive's reach:
 
 ---
 
-## 4. The critical bug we did NOT propagate
+## 4. The critical bug we did NOT propagate (now fixed in CPU module too)
 
-During planning we identified that `examples/ai-verifier/ocx_ai_verifier.py` signs **JSON without the OCX domain separator**. Its receipts do not verify via canonical `libocx-verify` — the existing demo only self-verifies via a handwritten Python verifier, which masks the gap.
+During planning we identified that `examples/ai-verifier/ocx_ai_verifier.py` signed **JSON without the OCX domain separator**. Its receipts did not verify via canonical `libocx-verify` — the existing demo only self-verified via a handwritten Python verifier, which masked the gap.
 
 This new GPU module was written from day one to use:
 - Canonical CBOR matching `pkg/receipt/types.go` byte-for-byte (verified with a parity fixture in `parity/`)
@@ -175,7 +175,7 @@ This new GPU module was written from day one to use:
 
 All verified end-to-end by having Python-produced receipts round-trip through the Rust `libocx-verify.so` `ocx_verify_receipt_detailed` FFI call, returning `OCX_SUCCESS`.
 
-The CPU ai-verifier will get the same fix in a follow-up, but tonight's work isolated the new GPU code from that bug entirely.
+**Follow-up shipped:** the CPU ai-verifier was then ported to the same canonical pipeline — see `examples/ai-verifier/ocx_ai_verifier.py` which now uses the same `canonical_receipt.py` + `ffi_verify.py` modules (mirrored between the two example directories for independence) and round-trips through the canonical Rust verifier returning `OCX_SUCCESS`. Both CPU and GPU examples now produce spec-compliant receipts.
 
 ---
 

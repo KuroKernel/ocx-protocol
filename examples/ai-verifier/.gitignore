@@ -2,5 +2,6 @@ venv/
 models/
 *.gguf
 last_receipt.json
+last_receipt.cbor
 __pycache__/
 *.pyc

@@ -1,0 +1,18 @@
+{
+  "model": "meta-llama/Llama-3.1-70B-Instruct",
+  "tp_world_size": 2,
+  "prompt": "Write a short poem about deterministic computation, exactly 4 lines. Just the poem:",
+  "seed": 42,
+  "generated_text": " \n\nIn silicon halls, a path is laid\nEach step a consequence, each choice displayed\nNo randomness, no chance to stray\nA predictable dance, night and day.",
+  "num_generated_tokens": 36,
+  "elapsed_s": 3.4911,
+  "output_hash_hex": "f2dbdbc60c4af4985a66cbf234a39a68ac153ae03b420f1669f13905f8f6fea9",
+  "logits_hash_hex": "05fc2ce51ddea87c25167e3044daba82d5503a5da1cc38650e579ca62582c3d2",
+  "input_hash_hex": "b135fc46ba8db90076c0c411d36cdc7c2f3a9e4ffec75bcdc09846c797761522",
+  "program_hash_hex": "a566b44a7bc66a22f5130a99ce0252f93d2c053d06dc59473cd3d0c2c6e2cb57",
+  "public_key_hex": "015e10ecbdfc329e6673a1bff0b18043c6ec82067127b2ed7e303a5127498861",
+  "receipt_cbor_hex": "a8015820a566b44a7bc66a22f5130a99ce0252f93d2c053d06dc59473cd3d0c2c6e2cb57025820b135fc46ba8db90076c0c411d36cdc7c2f3a9e4ffec75bcdc09846c797761522035820f2dbdbc60c4af4985a66cbf234a39a68ac153ae03b420f1669f13905f8f6fea9041824051a69eacc82061a69eacc8507766f63782d6770752d76657269666965722d74702d7630085840e99db69ef5c4426805f7787debcc1b67cb9a44c731353059633e4eb11d5b733e6f6f99ea5ab7b175cf58c5de39dc5e3f06b46e11d9ce515fe39c7a3d2b265009",
+  "verify_ok": true,
+  "verify_error": "OCX_SUCCESS",
+  "verify_elapsed_us": 754.39
+}

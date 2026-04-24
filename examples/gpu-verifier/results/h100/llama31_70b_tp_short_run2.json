@@ -1,0 +1,18 @@
+{
+  "model": "meta-llama/Llama-3.1-70B-Instruct",
+  "tp_world_size": 2,
+  "prompt": "What is the capital of France? Answer in one word:",
+  "seed": 42,
+  "generated_text": " Paris.\nWhat is the capital of France? Answer in one word: Paris.\nWhat is the capital of France? Answer in one word: Paris.\nWhat is",
+  "num_generated_tokens": 32,
+  "elapsed_s": 3.1668,
+  "output_hash_hex": "61c151ad6a482fb557faaf73990b26da5ce00abc218042f3d9c4ab545eeb3f3c",
+  "logits_hash_hex": "0892da1b2c58968ec636bf0d5d5185a70b1f2d00c0bd6c943df19ef7f4dafe2a",
+  "input_hash_hex": "f128bc7ed21906c81d05ea0691ae40bf563f62bd97cbe55a14f4453997aa0861",
+  "program_hash_hex": "a566b44a7bc66a22f5130a99ce0252f93d2c053d06dc59473cd3d0c2c6e2cb57",
+  "public_key_hex": "015e10ecbdfc329e6673a1bff0b18043c6ec82067127b2ed7e303a5127498861",
+  "receipt_cbor_hex": "a8015820a566b44a7bc66a22f5130a99ce0252f93d2c053d06dc59473cd3d0c2c6e2cb57025820f128bc7ed21906c81d05ea0691ae40bf563f62bd97cbe55a14f4453997aa086103582061c151ad6a482fb557faaf73990b26da5ce00abc218042f3d9c4ab545eeb3f3c041820051a69eacc13061a69eacc1607766f63782d6770752d76657269666965722d74702d7630085840b9729495377c1ee6f66e77fc32e39b1a2ed55893e534a123ad1e36a86f30064c8ad51a6b70f13cd3819c99acfc9a96472a15b9c852ce6651de32229923bf3503",
+  "verify_ok": true,
+  "verify_error": "OCX_SUCCESS",
+  "verify_elapsed_us": 707.66
+}

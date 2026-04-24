@@ -187,6 +187,34 @@ This is the Path 4 env-pinning argument from STRATEGY.md, measured. Receipts car
 
 Each scale has three fresh-process byte-identical artifacts committed in `results/h100/`.
 
+### Model-agnostic: Llama 3.1 70B on the same 2× H100 TP config
+
+To prove the primitive isn't Qwen-specific, we ran Llama 3.1 70B Instruct through the identical TP pipeline (`tp_plan="auto"`, NCCL ring allreduce over NV18 NVLink, bf16, eager attention, 3 fresh torchrun launches):
+
+**Llama 3.1 70B-Instruct short-gen (32 tokens):**
+- All 3 runs: `output_hash 61c151ad6a482fb557faaf73990b26da5ce00abc218042f3d9c4ab545eeb3f3c`
+- All 3 runs: `logits_hash 0892da1b2c58968ec636bf0d5d5185a70b1f2d00c0bd6c943df19ef7f4dafe2a`
+- ~3.1s per run, 3/3 OCX_SUCCESS ~700μs
+
+**Llama 3.1 70B-Instruct long-gen (36 tokens of a 4-line poem):**
+- All 3 runs: `output_hash f2dbdbc60c4af4985a66cbf234a39a68ac153ae03b420f1669f13905f8f6fea9`
+- All 3 runs: `logits_hash 05fc2ce51ddea87c25167e3044daba82d5503a5da1cc38650e579ca62582c3d2`
+- ~3.4s per run, 3/3 OCX_SUCCESS ~630μs
+- Model wrote: *"In silicon halls, a path is laid / Each step a consequence, each choice displayed / No randomness, no chance to stray / A predictable dance, night and day."*
+
+Receipt artifacts: `results/h100/llama31_70b_tp_{short,long}_run{1,2,3}.json`
+
+**The OCX receipt primitive is model-agnostic at frontier scale.** The same pipeline (canonical CBOR + Ed25519 domain-separated signing + Rust libocx-verify FFI) produces byte-identical, offline-verifiable receipts across two different 70B-class frontier models (Qwen 2.5-72B-Instruct, Meta Llama 3.1-70B-Instruct) running under tensor parallelism on the same 2× H100 NVLink topology.
+
+### OpenAI-compatible serving layer
+
+`ocx_openai_server.py` + `ocx_openai_client_demo.py` ship a FastAPI endpoint at `/v1/chat/completions` that is a drop-in replacement for OpenAI's API. Every response carries a canonical OCX receipt in both the response body (`ocx_receipt` extension field) and three HTTP headers (`X-OCX-Receipt-B64`, `X-OCX-PublicKey-Hex`, `X-OCX-Verify`). Measured end-to-end on the 2× H100 PP config with Qwen 72B:
+- HTTP round-trip: ~175 ms per call
+- Client-side verify (ctypes → libocx-verify.so): ~120 μs
+- Same-server byte-identity: 3/3 calls produced identical `output_hash`
+
+Integration cost for an enterprise LLM app already talking to OpenAI's API: one env var flip to change the base URL.
+
 ---
 
 ## 2. What was NOT tested (and is NOT claimed)

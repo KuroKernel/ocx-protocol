@@ -1,0 +1,18 @@
+{
+  "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+  "tp_world_size": 2,
+  "prompt": "Write a short poem about deterministic computation, exactly 4 lines. Just the poem:",
+  "seed": 42,
+  "generated_text": "\n\n```\nDeterministic computation,\nA dance of bits, no deviation.\nEach step, a rule, no aberration,\nIn this world of pure creation.\n```\n\nThis poem describes the idea of deterministic computation, where each step in the computation is determined by a set of rules, with no room for randomness or deviation. It's a world of pure creation, where the outcome is entirely predictable based on the initial state and the rules of the system. The \"dance of bits\" refers to the way that data is processed in binary form, with",
+  "num_generated_tokens": 128,
+  "elapsed_s": 5.9642,
+  "output_hash_hex": "64d095ccb651df556ffb7488e81507d659b0705e8ea7bbf1ea66f52c5c49d659",
+  "logits_hash_hex": "e045b7da1affba2a7662dbc93f986de332d44709f82a272385907f71061e902c",
+  "input_hash_hex": "b135fc46ba8db90076c0c411d36cdc7c2f3a9e4ffec75bcdc09846c797761522",
+  "program_hash_hex": "b082cb9696105ed3ca4471ccff22e815cce68967d7b79299aabcb0f4d97faa55",
+  "public_key_hex": "015e10ecbdfc329e6673a1bff0b18043c6ec82067127b2ed7e303a5127498861",
+  "receipt_cbor_hex": "a8015820b082cb9696105ed3ca4471ccff22e815cce68967d7b79299aabcb0f4d97faa55025820b135fc46ba8db90076c0c411d36cdc7c2f3a9e4ffec75bcdc09846c79776152203582064d095ccb651df556ffb7488e81507d659b0705e8ea7bbf1ea66f52c5c49d659041880051a69ec619c061a69ec61a207766f63782d6770752d76657269666965722d74702d7630085840fcc5ef7973ec6823e6d75907f95d96f3627e58bb6c79ad2a23482f7b5d44e5c7f9001616bc75775c1a51005b5bd3d039eef5f1860911d4e448ff88fe0bfb6b0b",
+  "verify_ok": true,
+  "verify_error": "OCX_SUCCESS",
+  "verify_elapsed_us": 478.01
+}

@@ -187,6 +187,27 @@ This is the Path 4 env-pinning argument from STRATEGY.md, measured. Receipts car
 
 Each scale has three fresh-process byte-identical artifacts committed in `results/h100/`.
 
+### MoE-capable: Mixtral 8x7B on the same 2× H100 TP config
+
+To rule out the "MoE has stochastic routing" objection, we also ran Mistral's Mixtral 8x7B Instruct v0.1 (47B total parameters, 13B active per token, 8 experts per layer with sparse top-2 routing) through the same TP pipeline. Three fresh torchrun launches:
+
+**Mixtral-8x7B-Instruct short-gen (32 tokens):**
+- All 3 runs: `output_hash c487fa84a08ef8721134660f8f97667c386d5da96c0a9105edbff6bdd5b5c088`
+- All 3 runs: `logits_hash b177675707da60f2d11488124e0ed9d953272992455462e56c4fefc0939f834e`
+- ~1.9s per run, 3/3 OCX_SUCCESS ~500μs
+
+**Mixtral-8x7B-Instruct long-gen (128 tokens):**
+- All 3 runs: `output_hash 64d095ccb651df556ffb7488e81507d659b0705e8ea7bbf1ea66f52c5c49d659`
+- All 3 runs: `logits_hash e045b7da1affba2a7662dbc93f986de332d44709f82a272385907f71061e902c`
+- ~6.1s per run, 3/3 OCX_SUCCESS ~470μs
+- Mixtral generated this poem (identical across all 3 runs):
+  > Deterministic computation,
+  > A dance of bits, no deviation.
+  > Each step, a rule, no aberration,
+  > In this world of pure creation.
+
+**Why this matters:** under greedy decoding (`do_sample=False, temperature=0.0`), the MoE router's expert selection is `argmax(router_logits)` for each token. Because the router logits themselves are byte-deterministic under TP (proven by the logits_hash equality), the expert selection is byte-deterministic, and the resulting top-2 expert outputs followed by the weighted combination produces a byte-deterministic forward pass. The "stochastic routing" objection only applies to load-balancing during training; at inference time with deterministic sampling, MoE is as deterministic as any dense layer. Receipt artifacts: `results/h100/mixtral_8x7b_tp_{short,long}_run{1,2,3}.json`.
+
 ### Model-agnostic: Llama 3.1 70B on the same 2× H100 TP config
 
 To prove the primitive isn't Qwen-specific, we ran Llama 3.1 70B Instruct through the identical TP pipeline (`tp_plan="auto"`, NCCL ring allreduce over NV18 NVLink, bf16, eager attention, 3 fresh torchrun launches):

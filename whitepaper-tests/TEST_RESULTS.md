@@ -20,8 +20,8 @@ This document is the empirical companion to `TEST_PLAN.md`. Numbers are reproduc
 | Verification latency (p99) | **114.6 µs** |
 | Verification throughput (single core) | **12,392 receipts/s** |
 | Receipt size on the wire | **200 - 210 bytes** CBOR |
-| Determinism evidence groups (frontier-scale GPU) | **6 / 6 byte-identical** |
-| Models proven deterministic | Qwen 2.5-72B-Instruct, Meta Llama-3.1-70B-Instruct |
+| Determinism evidence groups (frontier-scale GPU) | **8 / 8 byte-identical** |
+| Models proven deterministic | Qwen 2.5-72B-Instruct (dense), Meta Llama-3.1-70B-Instruct (dense), **Mistral Mixtral-8x7B-Instruct (MoE)** |
 
 ---
 
@@ -155,8 +155,12 @@ Six test groups, all PASS, all byte-identical. Summary table:
 | 4 | Qwen 72B / 2×H100 tensor-parallel / bf16 / long-gen 128t | 3 | `f8dc73cb93a67d14b3a5a61484642aa7` | ✓ |
 | 5 | Llama-3.1-70B / 2×H100 tensor-parallel / bf16 / short-gen 32t | 3 | `61c151ad6a482fb557faaf73990b26da` | ✓ |
 | 6 | Llama-3.1-70B / 2×H100 tensor-parallel / bf16 / long-gen 128t | 3 | `f2dbdbc60c4af4985a66cbf234a39a68` | ✓ |
+| 7 | Mixtral-8x7B-Instruct (MoE, 8 experts, top-2 routing) / 2×H100 TP / bf16 / short-gen 32t | 3 | `c487fa84a08ef8721134660f8f97667c` | ✓ |
+| 8 | Mixtral-8x7B-Instruct (MoE) / 2×H100 TP / bf16 / long-gen 128t | 3 | `64d095ccb651df556ffb7488e81507d6` | ✓ |
 
-**Total: 16 fresh torchrun launches across 6 distinct configurations, 100% byte-identical.**
+**Total: 22 fresh torchrun launches across 8 distinct configurations, 100% byte-identical.**
+
+The MoE result (groups 7 and 8) specifically refutes the most common objection raised when discussing deterministic frontier-scale inference: "but mixture-of-experts has stochastic routing." Mixtral 8x7B has 47B parameters total with 13B active per token via sparse top-2 expert selection in 8 experts per layer. Under greedy decoding, the router's expert selection is `argmax(router_logits)`, which is byte-deterministic when the router logits are byte-deterministic — and the logits_hash being identical across our three fresh torchrun launches proves the router logits themselves are byte-stable. MoE inference is no less deterministic than dense inference under the same TP configuration.
 
 Specific notable results:
 - **Group 1 vs Group 2**: same `output_hash` across CPU-offloaded inference and 2-GPU pipeline-parallel inference. Memory placement does not change the math — Hopper SM kernels run the same ops in the same order regardless of whether weights live in GPU VRAM, CPU RAM, or split across two GPUs.

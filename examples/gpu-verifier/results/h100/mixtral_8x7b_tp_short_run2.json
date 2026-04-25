@@ -1,0 +1,18 @@
+{
+  "model": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+  "tp_world_size": 2,
+  "prompt": "What is the capital of France? Answer in one word:",
+  "seed": 42,
+  "generated_text": "Paris.\n\nWhat is the capital of England? Answer in one word: London.\n\nWhat is the capital of the United States? Answer in one",
+  "num_generated_tokens": 32,
+  "elapsed_s": 1.897,
+  "output_hash_hex": "c487fa84a08ef8721134660f8f97667c386d5da96c0a9105edbff6bdd5b5c088",
+  "logits_hash_hex": "b177675707da60f2d11488124e0ed9d953272992455462e56c4fefc0939f834e",
+  "input_hash_hex": "f128bc7ed21906c81d05ea0691ae40bf563f62bd97cbe55a14f4453997aa0861",
+  "program_hash_hex": "b082cb9696105ed3ca4471ccff22e815cce68967d7b79299aabcb0f4d97faa55",
+  "public_key_hex": "015e10ecbdfc329e6673a1bff0b18043c6ec82067127b2ed7e303a5127498861",
+  "receipt_cbor_hex": "a8015820b082cb9696105ed3ca4471ccff22e815cce68967d7b79299aabcb0f4d97faa55025820f128bc7ed21906c81d05ea0691ae40bf563f62bd97cbe55a14f4453997aa0861035820c487fa84a08ef8721134660f8f97667c386d5da96c0a9105edbff6bdd5b5c088041820051a69ec612d061a69ec612f07766f63782d6770752d76657269666965722d74702d763008584077062fc6b4a1c167ee235a280d92e52769f330b969d3ee252df7a8fed8776303d95557ebf598b45b26e0ef80472bc3a8675a5cac54ed1f376575e0843893e50c",
+  "verify_ok": true,
+  "verify_error": "OCX_SUCCESS",
+  "verify_elapsed_us": 485.38
+}

@@ -31,6 +31,10 @@ def classify(filename: str) -> tuple[str, str]:
         return ("Meta Llama-3.1-70B-Instruct / 2×H100 tensor-parallel / bf16 / short-gen 32t", f)
     if f.startswith("llama31_70b_tp_long"):
         return ("Meta Llama-3.1-70B-Instruct / 2×H100 tensor-parallel / bf16 / long-gen 128t", f)
+    if f.startswith("mixtral_8x7b_tp_short"):
+        return ("Mistral Mixtral-8x7B-Instruct (MoE) / 2×H100 tensor-parallel / bf16 / short-gen 32t", f)
+    if f.startswith("mixtral_8x7b_tp_long"):
+        return ("Mistral Mixtral-8x7B-Instruct (MoE) / 2×H100 tensor-parallel / bf16 / long-gen 128t", f)
     return ("OTHER", f)
 
 

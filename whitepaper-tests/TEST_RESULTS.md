@@ -22,6 +22,9 @@ This document is the empirical companion to `TEST_PLAN.md`. Numbers are reproduc
 | Receipt size on the wire | **200 - 210 bytes** CBOR |
 | Determinism evidence groups (frontier-scale GPU) | **8 / 8 byte-identical** |
 | Models proven deterministic | Qwen 2.5-72B-Instruct (dense), Meta Llama-3.1-70B-Instruct (dense), **Mistral Mixtral-8x7B-Instruct (MoE)** |
+| Long-run warm-model stability | **11,000 sequential inferences, 0 byte-identity failures, 66 min continuous load** |
+| GPU memory drift over 10K iterations | **0 MiB** (Qwen 0.5B) |
+| GPU thermal range during long-run | 30-44 °C (within normal operating envelope) |
 
 ---
 
@@ -159,6 +162,23 @@ Six test groups, all PASS, all byte-identical. Summary table:
 | 8 | Mixtral-8x7B-Instruct (MoE) / 2×H100 TP / bf16 / long-gen 128t | 3 | `64d095ccb651df556ffb7488e81507d6` | ✓ |
 
 **Total: 22 fresh torchrun launches across 8 distinct configurations, 100% byte-identical.**
+
+### Long-run warm-model stability (drift test)
+
+A complementary test that loads a model ONCE and runs N inferences in a tight loop, asserting all outputs for each prompt class are byte-identical. This catches drift sources that fresh-process tests cannot: thermal throttle, accumulated CUDA stream state, KV cache allocator drift, cudnn workspace mutation, kernel scheduling variance.
+
+| Model | Iterations | Distinct prompts | Wall time | Failures | GPU temp range | GPU memory range |
+|---|---|---|---|---|---|---|
+| Mixtral-8x7B-Instruct (MoE), 2×H100 PP | **1,000** | 10 (×100 each) | 17.97 min | **0** | 33-44 °C (warmed under load) | **2 MiB** drift over 1000 iter |
+| Qwen 2.5-0.5B-Instruct, 1×H100 | **10,000** | 10 (×1000 each) | 47.79 min | **0** | 30-33 °C | **0 MiB** drift over 10000 iter |
+
+**Combined: 11,000 sequential warm-model inferences, 0 byte-identity failures, ~66 minutes of continuous load.**
+
+The Qwen 0.5B "What is the capital of France?" output_hash from this 10000-iteration run (`0fbfb8ecf647e1758a0af6cca95e6e3a086f9d82e958ec85ee7d4422cf31cfa7`) is **identical** to the same model+prompt's output_hash recorded in earlier sessions on three different GPU sessions across the past two weeks (5060 day-1 fp32 baseline, H100 short-gen baseline, and this long-run). Stack-level reproducibility holds.
+
+Receipt artifacts (full per-iteration JSONL):
+- `examples/gpu-verifier/results/h100/longrun_mixtral_8x7b_1000.jsonl`
+- `examples/gpu-verifier/results/h100/longrun_qwen_0p5b_10000.jsonl`
 
 The MoE result (groups 7 and 8) specifically refutes the most common objection raised when discussing deterministic frontier-scale inference: "but mixture-of-experts has stochastic routing." Mixtral 8x7B has 47B parameters total with 13B active per token via sparse top-2 expert selection in 8 experts per layer. Under greedy decoding, the router's expert selection is `argmax(router_logits)`, which is byte-deterministic when the router logits are byte-deterministic — and the logits_hash being identical across our three fresh torchrun launches proves the router logits themselves are byte-stable. MoE inference is no less deterministic than dense inference under the same TP configuration.
 

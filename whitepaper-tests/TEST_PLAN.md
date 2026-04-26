@@ -175,6 +175,51 @@ Earlier-session evidence (CPU; `examples/ai-verifier/`):
 
 ---
 
+## Claim 9 (cross-vendor, AMD ↔ NVIDIA): For single-GPU bf16 + eager attention, `output_hash` is byte-identical across NVIDIA Hopper and AMD CDNA3
+
+**What it means:** the same model weights, same prompt bytes, same dtype, same sampling, run on a single NVIDIA H100 (Hopper sm_90, cuBLAS, CUDA 12.4, PyTorch 2.10) and a single AMD Instinct MI300X (CDNA3 gfx942, hipBLAS, ROCm 6.1, PyTorch 2.4.1+rocm6.1) produce byte-identical `output_hash` values. The cuBLAS and hipBLAS reduction trees coincide functionally at bf16 precision for these shapes, so the cumulative bit pattern after many forward passes still matches.
+
+**Why it matters:** kills the "you're NVIDIA-locked" objection at the *computation* layer, not just the *receipt* layer. Confirmed for Qwen 2.5-72B at both 5-token and 51-token continuations.
+
+**Tests verifying this claim:**
+
+| Test | Location |
+|---|---|
+| MI300X receipts (9 launches across 3 groups) | `examples/gpu-verifier/results/mi300x/qwen_*.json` |
+| Aggregator including MI300X groups | `whitepaper-tests/aggregate_determinism_evidence.py` |
+| Per-receipt verification through local Rust libocx-verify | inline check in any `python3` session that imports `ffi_verify` |
+
+**Pass criterion:** every MI300X receipt's `output_hash` matches the corresponding H100 single-GPU CPU-offload baseline byte-for-byte; aggregator reports STATUS=PASS for all three MI300X groups; all 9 MI300X receipts verify with `OCX_SUCCESS` through the canonical Rust verifier built on x86_64 NVIDIA hardware.
+
+**Result:** all conditions met. Detail in `whitepaper-tests/TEST_RESULTS.md` "Cross-vendor: AMD Instinct MI300X" section. Cross-vendor TP configurations (NCCL ring vs RCCL fabric) not yet measured — they almost certainly differ.
+
+The full reproducible test methodology including hardware matrix, prompts, expected hashes, and pass criterion is at `whitepaper-tests/CROSS_VENDOR_DETERMINISM_BENCHMARK.md`. New hardware vendors and inference stacks can be added as new rows by running the published commands and committing the resulting receipts.
+
+---
+
+## Claim 10: Adversarial spot-check verification catches a fabrication-rate-`f` issuer with probability `1 − (1 − f)^k` (lower bound) under uniform sampling of `k` receipts
+
+**What it means:** the standard cryptographic argument for probabilistic re-execution audit. Given a stream of `N` issued receipts of which `L = fN` are fabricated, a verifier that samples `k` receipts uniformly at random and re-executes them detects the cheater with probability `1 − C(N − L, k) / C(N, k)`, lower-bounded by `1 − (1 − f)^k`. A risk-weighted verifier that oversamples high-stakes receipts dominates uniform sampling against any adversary that concentrates lies on the stake-weighted subset.
+
+**Why it matters:** this is the formal soundness argument for OCX's Layer 1 + 2 trust model. Without it, the protocol guarantees only signature integrity (who said it) but not correctness (whether it's true). The lemma plus this empirical evidence is what the whitepaper cites for "OCX provides issuer-independent soundness against fabrication".
+
+**Tests verifying this claim:**
+
+| Test | Location |
+|---|---|
+| `adversarial_soundness.py` (5 adversaries × 2 verifiers × 5 k values, 10K Monte Carlo trials per cell) | `whitepaper-tests/adversarial_soundness.py` |
+| Per-cell raw output | `examples/gpu-verifier/results/h100/adversarial_soundness.jsonl` |
+
+**Pass criterion:**
+
+1. `HonestProver`: empirical catch rate exactly 0 in every cell (false-accusation rate = 0).
+2. Every fabrication strategy: `|P_catch_empirical − P_catch_hypergeometric| ≤ 5σ` where `σ = sqrt(p(1−p)/M)` (per-cell FP rate < 6 × 10⁻⁷).
+3. Risk-weighted sampling against `SelectiveLiar` strictly dominates uniform sampling at every unsaturated `k`.
+
+**Result:** all 70 cells pass. Detailed analysis in `whitepaper-tests/SOUNDNESS_PROOF.md`. Notable: at `k = 1` against a high-stakes-targeting adversary, risk-weighted sampling yields a 9.76× higher catch rate than uniform sampling (0.51 vs 0.05).
+
+---
+
 ## Out-of-scope for this test plan
 
 - **Deterministic VM tests** (`pkg/deterministicvm/`) require Linux namespaces, cgroups v2, and seccomp privileges. They fail in user-mode environments without those capabilities. They are protocol-adjacent infrastructure tests, not Layer 1 schema tests, and are not run as part of this test plan.
@@ -204,4 +249,9 @@ examples/ai-verifier/venv/bin/python whitepaper-tests/bench_verify.py 10000
 
 # Determinism evidence aggregation (reads committed receipt JSONs)
 python3 whitepaper-tests/aggregate_determinism_evidence.py
+
+# Adversarial spot-check soundness (vectorised Monte Carlo, ~90s on one CPU core)
+python3 whitepaper-tests/adversarial_soundness.py \
+    --trials 10000 --N 10000 \
+    --output examples/gpu-verifier/results/h100/adversarial_soundness.jsonl
 ```

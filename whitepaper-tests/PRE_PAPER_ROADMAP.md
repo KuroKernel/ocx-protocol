@@ -56,10 +56,14 @@ A security paper without an adversary is incomplete. Build a mock "lying issuer"
 
 Effort: 2 days, ~200 lines of Python, no GPU needed for the spot-check protocol design.
 
+**STATUS — DONE 2026-04-25.** Implemented in `whitepaper-tests/adversarial_soundness.py`. Results: 5 adversary strategies × 2 verifier strategies × 5 k-values = 70 cells × 10,000 Monte Carlo trials each, 0 / 70 deviations from theoretical hypergeometric prediction at the 5σ envelope. Risk-weighted sampling against a stake-targeting adversary at `k = 1` yields a 9.76× catch-rate improvement over uniform sampling. Formal soundness lemma + threat model + comparison-to-alternatives table written up in `whitepaper-tests/SOUNDNESS_PROOF.md`. Per-cell raw data committed at `examples/gpu-verifier/results/h100/adversarial_soundness.jsonl`.
+
 ### 4. Cross-vendor hardware — AMD MI300X round-trip
 Kills the "you're NVIDIA-locked" objection. The OCX RECEIPT layer (canonical CBOR + Ed25519) is hardware-agnostic by construction; we prove this by running an AMD MI300X via RunPod / Lambda, producing receipts there, and confirming the canonical Rust libocx-verify accepts them byte-for-byte. We also note that the inference *outputs* will differ across vendors as expected (different SIMD reduction order across CDNA vs Hopper) — that boundary is identical to the cross-arch boundary we already documented for x86 ↔ ARM CPU.
 
 Effort: 4–6 hours including setup. ~₹1 500–2 500.
+
+**STATUS — DONE 2026-04-26 (with a positive surprise).** Provisioned 1× AMD MI300X on RunPod (₹165/hr). Installed PyTorch 2.4.1+rocm6.1, built libocx-verify with Rust 1.86 on the pod. Ran Qwen 2.5-0.5B and Qwen 2.5-72B at single-GPU bf16+eager attention. Headline finding contradicts the planning assumption: **for these configurations the inference outputs DO NOT differ across vendors — AMD MI300X produces byte-identical `output_hash` to NVIDIA H100 across 9 fresh launches in 3 (model, length) groups, including a 51-token continuation at frontier scale.** The 6 short-gen MI300X receipts also verify byte-for-byte through the local libocx-verify built on x86 NVIDIA hardware (cross-vendor receipt portability confirmed as expected). The receipt's environment binding still handles the general case where outputs differ; the empirical cross-vendor byte-identity is a useful surprise, not a guarantee. Receipts committed at `examples/gpu-verifier/results/mi300x/`. Paper §5.5 rewritten to lead with the cross-vendor finding; Table 1 expanded with three MI300X rows.
 
 ### 5. Formal threat model + theoretical framing section
 Positions OCX in the academic literature. Without this, reviewers say "this is engineering, not research." Define:

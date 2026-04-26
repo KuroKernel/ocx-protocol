@@ -184,3 +184,5 @@ api/.venv/
 src.backup-*/
 public.backup-*/
 api/.env
+libocx-verify-wasm/target/
+libocx-verify-wasm/pkg/

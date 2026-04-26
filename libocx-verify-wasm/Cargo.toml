@@ -1,0 +1,52 @@
+[package]
+name = "libocx-verify-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "Browser-side OCX receipt verifier — the canonical Rust verifier compiled to WebAssembly."
+license = "Apache-2.0 OR MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# The canonical verifier crate, minus the ring dual-check (which doesn't
+# cross-compile cleanly to wasm32-unknown-unknown). Signature verification
+# in this build runs through ed25519-dalek alone — the same library that
+# acts as the second cross-check in the native verifier, so the math is
+# identical, just without the redundant ring confirmation.
+libocx-verify = { path = "../libocx-verify", default-features = false }
+
+# Ed25519 verification — pure Rust, wasm-clean.
+ed25519-dalek = { version = "2.0", default-features = false }
+
+# wasm-bindgen surface for JS callers.
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+
+# Pretty panic messages in the browser console.
+console_error_panic_hook = { version = "0.1", optional = true }
+
+# Serde + wasm-bindgen-serde for structured JS return values.
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+
+# Hex parsing for the JS-facing convenience entrypoint.
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
+
+[features]
+default = ["console_error_panic_hook"]
+
+# Tighter wasm bundle — disables debug info, enables LTO, etc.
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# Skip wasm-pack's bundled wasm-opt — its old vendored binary chokes on
+# bulk-memory ops emitted by current rustc. The release profile above
+# already minimizes the binary; wasm-opt is a marginal extra pass.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

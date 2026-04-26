@@ -15,6 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS_DIR_H100 = ROOT / "examples" / "gpu-verifier" / "results" / "h100"
 RESULTS_DIR_MI300X = ROOT / "examples" / "gpu-verifier" / "results" / "mi300x"
+RESULTS_DIR_MI300X_TP = ROOT / "examples" / "gpu-verifier" / "results" / "mi300x_tp"
 
 
 def classify(filename: str) -> tuple[str, str]:
@@ -42,12 +43,14 @@ def classify(filename: str) -> tuple[str, str]:
         return ("Qwen2.5-72B-Instruct / 1×AMD MI300X (CDNA3) / bf16 / short-gen (5t emit)", f)
     if f.startswith("qwen_72b_long"):
         return ("Qwen2.5-72B-Instruct / 1×AMD MI300X (CDNA3) / bf16 / long-gen (51t emit)", f)
+    if f.startswith("qwen_72b_tp_long"):
+        return ("Qwen2.5-72B-Instruct / 2×AMD MI300X tensor-parallel (RCCL fabric) / bf16 / long-gen (58t emit)", f)
     return ("OTHER", f)
 
 
 def main():
     groups: dict[str, list[dict]] = defaultdict(list)
-    for results_dir in (RESULTS_DIR_H100, RESULTS_DIR_MI300X):
+    for results_dir in (RESULTS_DIR_H100, RESULTS_DIR_MI300X, RESULTS_DIR_MI300X_TP):
         if not results_dir.exists():
             continue
         for path in sorted(results_dir.glob("*.json")):

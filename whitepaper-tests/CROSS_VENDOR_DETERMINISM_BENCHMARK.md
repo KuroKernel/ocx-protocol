@@ -98,15 +98,15 @@ Three groups of rows: confirmed (we ran this), pending (we have hardware access 
 | 1× NVIDIA RTX 5060 (Blackwell sm_120) | PyTorch 2.12-nightly, CUDA 12.8 | ✅ matches `0fbfb8ec...` | — *(72B does not fit in 8GB VRAM)* | — |
 | 1× AMD Instinct MI300X (CDNA3 gfx942) | PyTorch 2.4.1+rocm6.1, ROCm 6.1 | ✅ matches `0fbfb8ec...` | ✅ matches `fe27f5da...` | ✅ matches `e59fca7d...` |
 | 2× NVIDIA H100 SXM, tensor-parallel (`tp_plan="auto"`, NCCL ring) | PyTorch 2.10, CUDA 12.4 | — | ✅ within-vendor `fe27f5da...` (matches CASE-B baseline by coincidence at 5-token EOS) | ✅ within-vendor `f8dc73cb...` (54 tokens — **differs from CASE-C baseline by reduction order, as expected**) |
+| 2× AMD Instinct MI300X, tensor-parallel (`tp_plan="auto"`, RCCL fabric) | PyTorch 2.5.1+rocm6.1, transformers 5.6.2, accelerate 1.13 | — | — | ✅ within-vendor `dd3fed4a...` (58 tokens — **byte-identical within MI300X across 3 fresh launches; differs from BOTH the H100 2×TP hash AND the MI300X single-GPU hash, by RCCL-vs-NCCL-vs-no-collective reduction order**) |
 
-Within-vendor 3-of-3 byte-identity holds in every confirmed row. Cross-vendor byte-identity holds in every confirmed *single-GPU* row. Cross-vendor on tensor-parallel was not yet measurable when this document was first written (RunPod MI300X 2-GPU availability constraint at time of writing).
+Within-vendor 3-of-3 byte-identity holds in every confirmed row. Cross-vendor byte-identity holds in every confirmed *single-GPU* row. Cross-vendor byte-identity does NOT hold for the tensor-parallel rows: NCCL ring all-reduce (NVIDIA) and RCCL fabric all-reduce (AMD) produce different reduction orders, so the resulting hashes differ. This is the empirically-drawn boundary of cross-vendor portability for the protocol's *computation* layer; the protocol's *receipt* layer is vendor-portable in all cases (every AMD-produced receipt verifies byte-for-byte through `libocx-verify` built on x86 NVIDIA).
 
 ### Pending
 
 | Hardware | Software | Status | Why we want this |
 |---|---|---|---|
-| 2× AMD Instinct MI300X, tensor-parallel | PyTorch 2.4.1+rocm6.1, ROCm 6.1, RCCL fabric all-reduce | scheduled, blocked on hardware availability | The clean cross-vendor TP question: does RCCL fabric all-reduce on AMD produce the same bit pattern as NCCL ring all-reduce on NVIDIA? Hypothesis: no. Honest data either way. |
-| 1× AMD MI300X with `attn_implementation="sdpa"` | as above | possible | Whether torch's SDPA fast path is bit-deterministic on AMD. Open question. |
+| 1× AMD MI300X with `attn_implementation="sdpa"` | torch 2.5.1+rocm6.1 | possible | Whether torch's SDPA fast path is bit-deterministic on AMD. Open question. |
 
 ### Open invitations
 

@@ -27,8 +27,9 @@ This document is the empirical companion to `TEST_PLAN.md`. Numbers are reproduc
 | GPU thermal range during long-run | 30-44 °C (within normal operating envelope) |
 | Adversarial spot-check soundness (Monte Carlo) | **70 cells × 10K trials, 0 / 70 deviations from theory** at 5σ |
 | Risk-weighted vs uniform sampling against targeted attacker (k = 1) | **9.76× higher catch rate** (0.51 vs 0.05) |
-| **Cross-vendor byte-identity (AMD MI300X ↔ NVIDIA H100)** | Qwen 2.5-72B at single-GPU bf16+eager, **9 fresh MI300X launches, 3 (model,length) groups, all match H100 baseline byte-for-byte**, including 51-token continuation |
-| **Cross-vendor receipt portability** | 9 / 9 AMD-produced receipts verified by `libocx-verify` built on x86 NVIDIA hardware (`OCX_SUCCESS`) |
+| **Cross-vendor byte-identity (AMD MI300X ↔ NVIDIA H100, single-GPU)** | Qwen 2.5-72B at single-GPU bf16+eager, **9 fresh MI300X launches, 3 (model,length) groups, all match H100 baseline byte-for-byte**, including 51-token continuation |
+| **Cross-vendor boundary line drawn (multi-GPU)** | 2× MI300X tensor-parallel (RCCL fabric), 3 fresh launches, byte-identical within MI300X (`dd3fed4a...`, 58 tokens) but **differs from NVIDIA 2× H100 TP (NCCL ring)** as predicted by reduction-order topology |
+| **Cross-vendor receipt portability** | 12 / 12 AMD-produced receipts verified by `libocx-verify` built on x86 NVIDIA hardware (`OCX_SUCCESS`) |
 
 ---
 
@@ -217,7 +218,7 @@ All 9 MI300X receipts (3 short Qwen 0.5B + 3 short Qwen 72B + 3 long Qwen 72B) v
 
 Receipts: `examples/gpu-verifier/results/mi300x/qwen_*.json` (and `.cbor`).
 
-**What this does NOT prove:** tensor-parallel configurations across vendors. NCCL ring all-reduce on NVIDIA versus RCCL fabric all-reduce on AMD almost certainly differ in reduction order, and we have not yet measured them. The cross-vendor positive result is for single-GPU configurations only. The receipt's environment binding remains the protocol-level mechanism that handles the general case.
+**Cross-vendor at multi-GPU scale (the boundary line).** We then ran the same poem prompt on 2× MI300X tensor-parallel using HuggingFace Transformers' native `tp_plan="auto"` (which dispatches collectives through RCCL fabric all-reduce on AMD, just as it dispatches through NCCL ring all-reduce on NVIDIA). Three fresh `torchrun` launches all produced `output_hash dd3fed4a55f1a550ebc16efe9ec84452f9cec5f67e89ee688030735316fff936` (58 tokens). Within-AMD-TP byte-identity holds (3/3 launches match, both ranks always agree per the in-script all-gather check). Cross-vendor at TP scale does NOT hold: AMD TP `dd3fed4a...` differs from NVIDIA H100 TP `f8dc73cb...`, and both differ from the AMD single-GPU `e59fca7d...`. Different all-reduce topologies (NCCL ring vs RCCL fabric vs no-collective) produce different reduction orders, which under greedy decoding produce different argmax tokens, which compound into different texts (the AMD TP poem reads "where paths are clear and **true**", the single-GPU MI300X variant reads "where paths are clear and **defined**"). Both substrates are individually byte-deterministic. This empirically draws the boundary of cross-vendor portability for the protocol's *computation* layer; the protocol's *receipt* layer remains vendor-portable in all cases (every AMD-produced receipt verifies through `libocx-verify` built on x86 NVIDIA — see Cross-vendor receipt portability headline above).
 
 ---
 
@@ -248,13 +249,13 @@ Per-cell raw data: `examples/gpu-verifier/results/h100/adversarial_soundness.jso
 | Cross-language round-trip | 8 | 8 |
 | Verification benchmark (10K receipts) | 10000 | 10000 |
 | Determinism evidence groups (committed receipts, NVIDIA H100) | 8 | 8 |
-| **Determinism evidence groups (committed receipts, AMD MI300X cross-vendor)** | **3** | **3** |
+| **Determinism evidence groups (committed receipts, AMD MI300X cross-vendor)** | **4** | **4** |
 | Long-run warm-model byte-identity (Mixtral 8x7B + Qwen 0.5B) | 11000 | 11000 |
 | Adversarial spot-check soundness (Monte Carlo cells) | 70 | 70 |
-| AMD-produced receipts verified through Rust libocx-verify (cross-vendor receipt portability) | 9 | 9 |
-| **Sum (excluding 10K bench bulk and 11K longrun bulk)** | **324** | **324** |
+| AMD-produced receipts verified through Rust libocx-verify (cross-vendor receipt portability) | 12 | 12 |
+| **Sum (excluding 10K bench bulk and 11K longrun bulk)** | **328** | **328** |
 
-Plus the bench: 10,000 distinct receipts verified successfully, plus 11,000 warm-model iterations all byte-identical, plus 700,000 Monte Carlo trials of the spot-check protocol, → **31,324 cumulative pass observations, 0 failures.**
+Plus the bench: 10,000 distinct receipts verified successfully, plus 11,000 warm-model iterations all byte-identical, plus 700,000 Monte Carlo trials of the spot-check protocol, → **31,328 cumulative pass observations, 0 failures.**
 
 ---
 

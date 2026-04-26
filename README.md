@@ -13,11 +13,12 @@ The full technical statement is in the whitepaper at [`whitepaper/paper.pdf`](wh
 | Claim | Evidence | Source |
 |---|---|---|
 | Byte-identical inference at frontier scale | 22 fresh `torchrun` launches across 8 model × parallelism configurations on NVIDIA H100; every group internally byte-identical | [`examples/gpu-verifier/results/h100/`](examples/gpu-verifier/results/h100/) |
-| **Cross-vendor byte-identity (AMD ↔ NVIDIA)** | Qwen 2.5-72B on AMD MI300X (CDNA3) produces the **same `output_hash` byte-for-byte** as NVIDIA H100 (Hopper) for single-GPU bf16 + eager attention, including a 51-token continuation. 9 fresh MI300X launches across 3 (model, length) groups, all match H100 baseline. | [`examples/gpu-verifier/results/mi300x/`](examples/gpu-verifier/results/mi300x/) |
+| **Cross-vendor byte-identity (AMD ↔ NVIDIA, single-GPU)** | Qwen 2.5-72B on AMD MI300X (CDNA3) produces the **same `output_hash` byte-for-byte** as NVIDIA H100 (Hopper) for single-GPU bf16 + eager attention, including a 51-token continuation. 9 fresh MI300X launches across 3 (model, length) groups, all match H100 baseline. | [`examples/gpu-verifier/results/mi300x/`](examples/gpu-verifier/results/mi300x/) |
+| **Cross-vendor boundary (multi-GPU TP)** | 2× MI300X tensor-parallel produces hash `dd3fed4a...` (58 tokens) — **byte-identical within MI300X across 3 fresh launches, but differs from NVIDIA 2× H100 TP `f8dc73cb...`** as predicted by RCCL-fabric vs NCCL-ring all-reduce topology. The boundary is at the multi-GPU collective layer. | [`examples/gpu-verifier/results/mi300x_tp/`](examples/gpu-verifier/results/mi300x_tp/) |
 | Mixture-of-experts is byte-deterministic under greedy decoding | Mixtral 8x7B on 2× H100 tensor-parallel, 3 fresh launches, identical `output_hash` and `logits_hash` | `mixtral_8x7b_tp_*.json` |
 | Long-run warm-model stability | 11,000 sequential inferences (1K Mixtral 8x7B + 10K Qwen 2.5-0.5B), 0 byte-identity failures, 2 MiB peak memory drift | [`longrun_*.jsonl`](examples/gpu-verifier/results/h100/) |
 | Cross-language receipt portability | Go ↔ Python ↔ Rust round-trip, byte-identical canonical CBOR, signature parity, 8/8 tests | [`whitepaper-tests/cross_language_roundtrip.{go,py}`](whitepaper-tests/) |
-| **Cross-vendor receipt portability** | Receipts produced on AMD MI300X verify byte-for-byte through the Rust `libocx-verify` built on x86 NVIDIA hardware. 9/9 receipts pass `OCX_SUCCESS`. | [`examples/gpu-verifier/results/mi300x/`](examples/gpu-verifier/results/mi300x/) |
+| **Cross-vendor receipt portability** | Receipts produced on AMD MI300X (single-GPU and 2× tensor-parallel) verify byte-for-byte through the Rust `libocx-verify` built on x86 NVIDIA hardware. 12/12 receipts pass `OCX_SUCCESS`. | [`examples/gpu-verifier/results/mi300x*/`](examples/gpu-verifier/) |
 | Verification is sub-millisecond | 79.4 µs median, 114.6 µs p99, 12,392 receipts/sec on a single core | [`whitepaper-tests/bench_verify.py`](whitepaper-tests/bench_verify.py) |
 | Spot-check soundness matches `1 − (1−f)^k` | 70 cells × 10,000 Monte Carlo trials, 0 deviations from theory at the 5σ envelope | [`whitepaper-tests/SOUNDNESS_PROOF.md`](whitepaper-tests/SOUNDNESS_PROOF.md) |
 | Risk-weighted sampling beats uniform against targeted fraud | 9.76× higher catch rate at k=1 against a stake-targeting adversary | `adversarial_soundness.jsonl` |
@@ -81,7 +82,7 @@ python3 whitepaper-tests/bench_verify.py 10000
 ```bash
 # Aggregate every committed receipt into the byte-identity matrix
 python3 whitepaper-tests/aggregate_determinism_evidence.py
-# Expected: 11 / 11 model × hardware × parallelism groups byte-identical
+# Expected: 12 / 12 model × hardware × parallelism groups byte-identical
 ```
 
 The full reproducible test methodology — hardware matrix, exact prompts, expected hashes, pass criteria — is specified in [`whitepaper-tests/CROSS_VENDOR_DETERMINISM_BENCHMARK.md`](whitepaper-tests/CROSS_VENDOR_DETERMINISM_BENCHMARK.md). Anyone with comparable hardware can run the listed commands and observe the same hashes.

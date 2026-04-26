@@ -1,0 +1,18 @@
+{
+  "model": "Qwen/Qwen2.5-72B-Instruct",
+  "tp_world_size": 2,
+  "prompt": "Write a short poem about deterministic computation, exactly 4 lines. Just the poem:",
+  "seed": 42,
+  "generated_text": " no titles, no author names.\nIn circuits of logic, where paths are clear and true,  \nEach step a consequence, of what came just before,  \nNo room for chance or whimsy, in this world so sure,  \nDeterministic dance, where every move is fore.",
+  "num_generated_tokens": 58,
+  "elapsed_s": 36.5496,
+  "output_hash_hex": "dd3fed4a55f1a550ebc16efe9ec84452f9cec5f67e89ee688030735316fff936",
+  "logits_hash_hex": "a3eeb8897fdedf970e8a59a685509c4dd4b8c6c88c71a9ecc17b0726bb6ec916",
+  "input_hash_hex": "b135fc46ba8db90076c0c411d36cdc7c2f3a9e4ffec75bcdc09846c797761522",
+  "program_hash_hex": "5c67d0b5b929998e34b6d4e061ff6bbb658206e76d6e42a3e3f3a125348a36e3",
+  "public_key_hex": "015e10ecbdfc329e6673a1bff0b18043c6ec82067127b2ed7e303a5127498861",
+  "receipt_cbor_hex": "a80158205c67d0b5b929998e34b6d4e061ff6bbb658206e76d6e42a3e3f3a125348a36e3025820b135fc46ba8db90076c0c411d36cdc7c2f3a9e4ffec75bcdc09846c797761522035820dd3fed4a55f1a550ebc16efe9ec84452f9cec5f67e89ee688030735316fff93604183a051a69edce45061a69edce6a07766f63782d6770752d76657269666965722d74702d7630085840f77f15eafff8e72bdf57f42a2b2399e726d3acec27f3da8ecb20cd9857f7d3a780e8c81c24b63720ed22ab3b4caeaed3781f1a15be29eb04c6f3374ddf88340c",
+  "verify_ok": true,
+  "verify_error": "OCX_SUCCESS",
+  "verify_elapsed_us": 12840.05
+}

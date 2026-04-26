@@ -4,7 +4,6 @@ import Layout from "./components/Layout";
 import Home from "./pages/Home";
 import Paper from "./pages/Paper";
 import Spec from "./pages/Spec";
-import Verify from "./pages/Verify";
 import Pricing from "./pages/Pricing";
 import Welcome from "./pages/Welcome";
 import Account from "./pages/Account";
@@ -16,7 +15,6 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/paper" element={<Paper />} />
         <Route path="/spec" element={<Spec />} />
-        <Route path="/verify" element={<Verify />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/account" element={<Account />} />

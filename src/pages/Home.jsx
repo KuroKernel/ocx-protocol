@@ -251,20 +251,21 @@ export default function Home() {
 03 5820                         # key 3: output_hash
    c487fa84 a08ef872 1134660f 8f97667c
    386d5da9 6c0a9105 edbff6bd d5b5c088
-04 1820                         # key 4: gas_used = 32
+04 1820                         # key 4: cycles_used = 32
 05 1a 69ec611d                  # key 5: started_at
 06 1a 69ec611e                  # key 6: finished_at
-07 76 6f63782d6770752d76657269  # key 7: issuer_id
-   66 6965722d74702d7630
+07 75 6f63782d776562736974652d  # key 7: issuer_id
+   73 616d706c652d7631
 08 5840                         # key 8: ed25519 signature, 64B
-   d3ce37eb 0e6e456f 654d5bad c6f72426
-   76914efc c13e31b1 c45012fa eb3f3b12
-   fe8cdac2 e039ea13 29fc1fd6 9fd02bd0
-   5dac9fee cefac99e 7c080c28 8dfeb503`}
+   eb299f3d 9f67d0de 3af87263 49bf95a1
+   4073c09f bdaf7b6d 90a3f8da cc844c5c
+   b017c73f a4660cde d7322bd8 465868f5
+   66cf4162 0c621167 03154bbc 4eaf0e05`}
                 </pre>
                 <div className="mt-6 pt-6 border-t border-stone-200 text-[12px] text-stone-500 leading-relaxed">
-                  Mixtral 8×7B inference, 2× H100 tensor-parallel · 208 wire bytes ·
-                  verified through libocx-verify in 522 µs.
+                  Real signed receipt · 211 wire bytes · the canonical Rust
+                  verifier (200 LOC, MIT) confirms the signature offline in
+                  microseconds.
                 </div>
               </div>
             </Reveal>

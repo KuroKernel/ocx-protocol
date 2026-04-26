@@ -41,16 +41,3 @@
   [headers.values]
     Cache-Control = "public, max-age=3600"
 
-# WASM verifier — explicit MIME type for streaming compile, plus a short
-# cache window so updates to libocx-verify-wasm propagate within an hour.
-[[headers]]
-  for = "/wasm/*.wasm"
-  [headers.values]
-    Content-Type = "application/wasm"
-    Cache-Control = "public, max-age=3600"
-
-[[headers]]
-  for = "/wasm/*.js"
-  [headers.values]
-    Content-Type = "application/javascript; charset=utf-8"
-    Cache-Control = "public, max-age=3600"

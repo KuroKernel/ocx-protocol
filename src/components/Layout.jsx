@@ -5,7 +5,6 @@ import { Wordmark } from "./Logo";
 const navItems = [
   { to: "/paper", label: "Whitepaper" },
   { to: "/spec", label: "Specification" },
-  { to: "/verify", label: "Verify" },
   { to: "/pricing", label: "Pricing" },
 ];
 
@@ -230,7 +229,6 @@ const Footer = () => (
         <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
           <Link to="/paper" className="link-mute text-[14px] sm:text-[13px]">Whitepaper</Link>
           <Link to="/spec" className="link-mute text-[14px] sm:text-[13px]">Spec</Link>
-          <Link to="/verify" className="link-mute text-[14px] sm:text-[13px]">Verify</Link>
           <Link to="/pricing" className="link-mute text-[14px] sm:text-[13px]">Pricing</Link>
           <a
             href="https://github.com/KuroKernel/ocx-protocol"

@@ -1,5 +1,4 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import Diagram from "../components/Diagram";
 
 export default function Spec() {
@@ -110,12 +109,6 @@ signature  =  Ed25519.sign(m, private_key)
           <span className="mono text-ink break-all">OCX_INVALID_TIMESTAMP</span>.
           Linked into Python (ctypes) and Go (cgo) clients.
         </p>
-        <Link
-          to="/verify"
-          className="mt-10 sm:mt-12 inline-flex items-center text-ink underline underline-offset-[6px] decoration-stone-400 hover:decoration-ink"
-        >
-          Try the verifier on a receipt →
-        </Link>
       </section>
     </>
   );

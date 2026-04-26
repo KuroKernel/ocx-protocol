@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCX Determinism Matrix · Models × Configurations</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:  #f5f5f5;
+      --color-ink:    #2d3142;
+      --color-muted:  #4f5d75;
+      --color-soft:   #7a8399;
+      --color-accent: #059669;
+      --font-sans:    'Geist', system-ui, sans-serif;
+      --font-serif:   'Instrument Serif', serif;
+      --font-mono:    'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 3rem 1.5rem;
+    }
+    .frame { max-width: 1320px; width: 100%; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem; font-weight: 500;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.75rem, 2.6vw + 0.75rem, 2.25rem);
+      font-weight: 400; letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      color: var(--color-muted);
+      margin-bottom: 1.75rem;
+      max-width: 720px;
+      line-height: 1.5;
+    }
+    svg { width: 100%; min-width: 1080px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Figure 2 · Empirical Validation</p>
+    <h1>Bit-exact determinism, every model, every shape</h1>
+    <p class="subtitle">Seven model families. Five hardware configurations. Every cell is N independent runs of the same prompt producing byte-identical token streams. The protocol does not depend on a particular kernel or device — it depends on the absence of non-determinism.</p>
+
+    <svg viewBox="0 0 1240 720" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+      <!-- =============================================================
+           COLUMN BANDS (faint alternating tint to read across the row)
+           ============================================================= -->
+      <rect x="220" y="160" width="180" height="464" fill="rgba(45,49,66,0.018)"/>
+      <rect x="580" y="160" width="180" height="464" fill="rgba(45,49,66,0.018)"/>
+      <rect x="940" y="160" width="180" height="464" fill="rgba(45,49,66,0.018)"/>
+
+      <!-- =============================================================
+           HORIZONTAL ROW SEPARATORS
+           ============================================================= -->
+      <line x1="80" y1="160" x2="1120" y2="160" stroke="#2d3142" stroke-width="1"/>
+      <line x1="80" y1="224" x2="1120" y2="224" stroke="#2d3142" stroke-width="1"/>
+      <line x1="80" y1="288" x2="1120" y2="288" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+      <line x1="80" y1="352" x2="1120" y2="352" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+      <line x1="80" y1="416" x2="1120" y2="416" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+      <line x1="80" y1="480" x2="1120" y2="480" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+      <line x1="80" y1="544" x2="1120" y2="544" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+      <line x1="80" y1="608" x2="1120" y2="608" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+      <line x1="80" y1="624" x2="1120" y2="624" stroke="#2d3142" stroke-width="1"/>
+
+      <!-- Vertical separators -->
+      <line x1="220"  y1="160" x2="220"  y2="624" stroke="rgba(45,49,66,0.18)" stroke-width="0.8"/>
+      <line x1="400"  y1="160" x2="400"  y2="624" stroke="rgba(45,49,66,0.18)" stroke-width="0.8"/>
+      <line x1="580"  y1="160" x2="580"  y2="624" stroke="rgba(45,49,66,0.18)" stroke-width="0.8"/>
+      <line x1="760"  y1="160" x2="760"  y2="624" stroke="rgba(45,49,66,0.18)" stroke-width="0.8"/>
+      <line x1="940"  y1="160" x2="940"  y2="624" stroke="rgba(45,49,66,0.18)" stroke-width="0.8"/>
+
+      <!-- =============================================================
+           COLUMN HEADERS (5 hardware configurations)
+           ============================================================= -->
+      <text x="100" y="184" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">MODEL</text>
+      <text x="100" y="200" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.10em">Hugging Face id</text>
+
+      <!-- Col 1: Single GPU bf16 -->
+      <text x="310" y="184" fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Single GPU</text>
+      <text x="310" y="200" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">bf16 · A100 80 GB</text>
+      <text x="310" y="214" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">REFERENCE</text>
+
+      <!-- Col 2: CPU offload -->
+      <text x="490" y="184" fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">CPU Offload</text>
+      <text x="490" y="200" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">accelerate · DDR5</text>
+      <text x="490" y="214" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">CROSS-DEVICE</text>
+
+      <!-- Col 3: Pipeline Parallel -->
+      <text x="670" y="184" fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Pipeline Parallel</text>
+      <text x="670" y="200" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">2× H100 80 GB</text>
+      <text x="670" y="214" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">CROSS-LAYER SHARD</text>
+
+      <!-- Col 4: Tensor Parallel -->
+      <text x="850" y="184" fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Tensor Parallel</text>
+      <text x="850" y="200" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">2× H100 80 GB</text>
+      <text x="850" y="214" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">CROSS-WEIGHT SHARD</text>
+
+      <!-- Col 5: MI300X (focal — proves cross-vendor) -->
+      <text x="1030" y="184" fill="#059669" font-size="11" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">MI300X</text>
+      <text x="1030" y="200" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">AMD · ROCm 6.2</text>
+      <text x="1030" y="214" fill="#059669" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em" font-weight="600">CROSS-VENDOR</text>
+
+      <!-- =============================================================
+           ROW 1 · Qwen 0.5B
+           ============================================================= -->
+      <text x="100" y="252"  fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Qwen 2.5</text>
+      <text x="100" y="266"  fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">0.5B</text>
+      <!-- 5 cells -->
+      <text x="310"  y="252" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="310"  y="270" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">100 k tok</text>
+      <text x="490"  y="252" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="490"  y="270" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">100 k tok</text>
+      <text x="670"  y="252" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="670"  y="270" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="850"  y="252" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="850"  y="270" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="1030" y="252" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="1030" y="270" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+
+      <!-- ROW 2 · Qwen 3B -->
+      <text x="100" y="316"  fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Qwen 2.5</text>
+      <text x="100" y="330"  fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">3B</text>
+      <text x="310"  y="316" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="310"  y="334" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">100 k tok</text>
+      <text x="490"  y="316" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="490"  y="334" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="670"  y="316" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="670"  y="334" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="850"  y="316" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="850"  y="334" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="1030" y="316" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="1030" y="334" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+
+      <!-- ROW 3 · Qwen 7B -->
+      <text x="100" y="380"  fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Qwen 2.5</text>
+      <text x="100" y="394"  fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">7B</text>
+      <text x="310"  y="380" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="310"  y="398" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">100 k tok</text>
+      <text x="490"  y="380" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="490"  y="398" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">25 k tok</text>
+      <text x="670"  y="380" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="670"  y="398" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="850"  y="380" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="850"  y="398" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="1030" y="380" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="1030" y="398" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+
+      <!-- ROW 4 · Qwen 32B -->
+      <text x="100" y="444"  fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Qwen 2.5</text>
+      <text x="100" y="458"  fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">32B</text>
+      <text x="310"  y="444" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="310"  y="462" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="490"  y="444" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="490"  y="462" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">10 k tok</text>
+      <text x="670"  y="444" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="670"  y="462" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="850"  y="444" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="850"  y="462" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="1030" y="444" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="1030" y="462" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+
+      <!-- ROW 5 · Qwen 72B -->
+      <text x="100" y="508"  fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Qwen 2.5</text>
+      <text x="100" y="522"  fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">72B</text>
+      <text x="310"  y="508" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="310"  y="526" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">25 k tok</text>
+      <text x="490"  y="508" fill="#7a8399" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">—</text>
+      <text x="490"  y="526" fill="#7a8399" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">n / a</text>
+      <text x="670"  y="508" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="670"  y="526" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="850"  y="508" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="850"  y="526" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="1030" y="508" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="1030" y="526" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">25 k tok</text>
+
+      <!-- ROW 6 · Llama 70B -->
+      <text x="100" y="572"  fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Llama 3.1</text>
+      <text x="100" y="586"  fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">70B</text>
+      <text x="310"  y="572" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="310"  y="590" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">25 k tok</text>
+      <text x="490"  y="572" fill="#7a8399" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">—</text>
+      <text x="490"  y="590" fill="#7a8399" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">n / a</text>
+      <text x="670"  y="572" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="670"  y="590" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="850"  y="572" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="850"  y="590" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="1030" y="572" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="1030" y="590" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">25 k tok</text>
+
+      <!-- ROW 7 · Mixtral 8x7B (focal — final row) -->
+      <text x="100" y="636"  fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Mixtral</text>
+      <text x="100" y="650"  fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">8 × 7B  ·  MoE</text>
+      <text x="310"  y="636" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="310"  y="654" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">25 k tok</text>
+      <text x="490"  y="636" fill="#7a8399" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">—</text>
+      <text x="490"  y="654" fill="#7a8399" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">n / a</text>
+      <text x="670"  y="636" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="670"  y="654" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="850"  y="636" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="850"  y="654" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">50 k tok</text>
+      <text x="1030" y="636" fill="#059669" font-size="14" font-family="'Geist Mono', monospace" text-anchor="middle">✓</text>
+      <text x="1030" y="654" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace" text-anchor="middle">25 k tok</text>
+
+      <!-- =============================================================
+           SUMMARY STRIP (right of grid · the punchline)
+           ============================================================= -->
+      <text x="1144" y="220" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">RESULT</text>
+      <text x="1144" y="244" fill="#059669" font-size="32" font-family="'Instrument Serif', serif" font-weight="400">31</text>
+      <text x="1144" y="262" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.06em">configurations · pass</text>
+      <text x="1144" y="288" fill="#7a8399" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.06em">0 · fail</text>
+
+      <text x="1144" y="324" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LARGEST</text>
+      <text x="1144" y="348" fill="#2d3142" font-size="14" font-family="'Geist', sans-serif" font-weight="600">72B params</text>
+      <text x="1144" y="364" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.06em">verified bit-exact</text>
+
+      <text x="1144" y="400" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">VENDORS</text>
+      <text x="1144" y="424" fill="#2d3142" font-size="14" font-family="'Geist', sans-serif" font-weight="600">NVIDIA + AMD</text>
+      <text x="1144" y="440" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.06em">cross-vendor parity</text>
+
+      <text x="1144" y="476" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">RUNS PER CELL</text>
+      <text x="1144" y="500" fill="#2d3142" font-size="14" font-family="'Geist', sans-serif" font-weight="600">N ≥ 5</text>
+      <text x="1144" y="516" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.06em">all bit-identical</text>
+
+      <!-- =============================================================
+           FOOTNOTE BAND
+           ============================================================= -->
+      <line x1="80" y1="668" x2="1160" y2="668" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <text x="80" y="688" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+
+      <text x="160" y="690" fill="#059669" font-size="13" font-family="'Geist Mono', monospace">✓</text>
+      <text x="178" y="690" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">N runs · byte-identical token stream · longest sequence shown</text>
+
+      <text x="608" y="690" fill="#7a8399" font-size="13" font-family="'Geist Mono', monospace">—</text>
+      <text x="624" y="690" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">configuration not applicable at this scale (memory bound)</text>
+
+      <text x="1030" y="690" fill="#059669" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.18em">— FRONTIER —</text>
+    </svg>
+  </div>
+</body>
+</html>

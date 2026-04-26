@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCX Soundness Curve · P[catch] vs probes</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:  #f5f5f5;
+      --color-ink:    #2d3142;
+      --color-muted:  #4f5d75;
+      --color-soft:   #7a8399;
+      --color-accent: #059669;
+      --font-sans:    'Geist', system-ui, sans-serif;
+      --font-serif:   'Geist', sans-serif;
+      --font-mono:    'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 3rem 1.5rem;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem; font-weight: 500;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-sans);
+      font-size: clamp(1.75rem, 2.6vw + 0.75rem, 2.25rem);
+      font-weight: 400; letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      color: var(--color-muted);
+      margin-bottom: 1.75rem;
+      max-width: 720px;
+      line-height: 1.5;
+    }
+    svg { width: 100%; min-width: 960px; display: block; }
+    /* Mobile-embed adjustments — tighten chrome so the diagram fills
+       more of the 1080px-wide iframe the parent component renders. */
+    @media (max-width: 720px) {
+      body { padding: 1.25rem 1rem 2rem; }
+      .frame { max-width: 100%; }
+      h1 { font-size: 1.25rem !important; line-height: 1.2 !important; margin-bottom: 0.35rem !important; }
+      .subtitle { font-size: 0.85rem !important; margin-bottom: 1rem !important; }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Figure 3 · Soundness</p>
+    <h1>Cheating gets exponentially harder, fast</h1>
+    <p class="subtitle">For an issuer fabricating a fraction <em>f</em> of receipts, <em>k</em> independent probes catch them with probability <em>P = 1 − (1−f)<sup>k</sup></em>. The curve below is the entire security argument.</p>
+
+    <svg viewBox="0 0 1200 760" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/>
+        </marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#059669"/>
+        </marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+      <!-- =============================================================
+           PLOT FRAME
+           Plot area: x = 100..980  (880 px → k from 0 to 200)
+                      y = 140..540  (400 px → P from 1.0 to 0.0)
+           ============================================================= -->
+
+      <!-- Y-axis gridlines + tick labels (P from 0.0 to 1.0 in 0.2) -->
+      <line x1="100" y1="140" x2="980" y2="140" stroke="rgba(45,49,66,0.08)" stroke-width="0.8"/>
+      <line x1="100" y1="220" x2="980" y2="220" stroke="rgba(45,49,66,0.08)" stroke-width="0.8"/>
+      <line x1="100" y1="300" x2="980" y2="300" stroke="rgba(45,49,66,0.08)" stroke-width="0.8"/>
+      <line x1="100" y1="380" x2="980" y2="380" stroke="rgba(45,49,66,0.08)" stroke-width="0.8"/>
+      <line x1="100" y1="460" x2="980" y2="460" stroke="rgba(45,49,66,0.08)" stroke-width="0.8"/>
+      <line x1="100" y1="540" x2="980" y2="540" stroke="#2d3142" stroke-width="1"/>
+
+      <text x="92" y="144" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">1.0</text>
+      <text x="92" y="224" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">0.8</text>
+      <text x="92" y="304" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">0.6</text>
+      <text x="92" y="384" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">0.4</text>
+      <text x="92" y="464" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">0.2</text>
+      <text x="92" y="544" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end">0.0</text>
+
+      <!-- X-axis (left axis line + tick labels for k = 0, 50, 100, 150, 200) -->
+      <line x1="100" y1="140" x2="100" y2="540" stroke="#2d3142" stroke-width="1"/>
+      <line x1="100" y1="540" x2="100" y2="548" stroke="#2d3142" stroke-width="1"/>
+      <line x1="320" y1="540" x2="320" y2="548" stroke="rgba(45,49,66,0.30)" stroke-width="0.8"/>
+      <line x1="540" y1="540" x2="540" y2="548" stroke="rgba(45,49,66,0.30)" stroke-width="0.8"/>
+      <line x1="760" y1="540" x2="760" y2="548" stroke="rgba(45,49,66,0.30)" stroke-width="0.8"/>
+      <line x1="980" y1="540" x2="980" y2="548" stroke="rgba(45,49,66,0.30)" stroke-width="0.8"/>
+
+      <text x="100" y="562" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">0</text>
+      <text x="320" y="562" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">50</text>
+      <text x="540" y="562" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">100</text>
+      <text x="760" y="562" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">150</text>
+      <text x="980" y="562" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">200</text>
+
+      <!-- Axis labels (Geist Mono eyebrow) -->
+      <text x="540" y="588" fill="#2d3142" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.18em">K   ·   PROBES PER CYCLE</text>
+      <text x="40"  y="340" fill="#2d3142" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.18em" transform="rotate(-90 40 340)">P [ CATCH ]</text>
+
+      <!-- =============================================================
+           CURVE A · f = 0.001  (rare cheating — slow growth, soft)
+           ============================================================= -->
+      <polyline fill="none" stroke="#7a8399" stroke-width="1.4" stroke-dasharray="3,3"
+                points="100,540
+                        144,536
+                        188,532
+                        232,528
+                        276,524
+                        320,520
+                        364,517
+                        408,513
+                        452,510
+                        496,507
+                        540,503
+                        584,500
+                        628,497
+                        672,494
+                        716,491
+                        760,488
+                        804,485
+                        848,482
+                        892,479
+                        936,476
+                        980,472"/>
+
+      <!-- =============================================================
+           CURVE B · f = 0.01  (the worked example — muted ink solid)
+           ============================================================= -->
+      <polyline fill="none" stroke="#2d3142" stroke-width="1.6"
+                points="100,540
+                        144,502
+                        188,467
+                        232,435
+                        276,407
+                        320,381
+                        364,358
+                        408,338
+                        452,319
+                        496,302
+                        540,287
+                        584,273
+                        628,261
+                        672,250
+                        716,240
+                        760,231
+                        804,222
+                        848,215
+                        892,208
+                        936,201
+                        980,196"/>
+
+      <!-- =============================================================
+           CURVE C · f = 0.1  (frequent cheating — fast catch, accent)
+           ============================================================= -->
+      <polyline fill="none" stroke="#059669" stroke-width="1.8"
+                points="100,540
+                        122,524
+                        144,508
+                        166,490
+                        188,470
+                        210,448
+                        232,425
+                        254,400
+                        276,374
+                        298,348
+                        320,322
+                        342,297
+                        364,275
+                        386,254
+                        408,236
+                        430,221
+                        452,208
+                        474,196
+                        496,186
+                        540,170
+                        584,159
+                        628,152
+                        672,147
+                        716,144
+                        760,142
+                        804,141
+                        848,140
+                        892,140
+                        936,140
+                        980,140"/>
+
+      <!-- =============================================================
+           CURVE END LABELS (right-edge label — quiet, in-line)
+           ============================================================= -->
+      <rect x="988" y="134" width="84" height="14" rx="2" fill="#f5f5f5"/>
+      <text x="996" y="145" fill="#059669" font-size="10" font-family="'Geist Mono', monospace" font-weight="600">f = 0.1</text>
+      <text x="996" y="158" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">10% cheats</text>
+
+      <rect x="988" y="190" width="84" height="14" rx="2" fill="#f5f5f5"/>
+      <text x="996" y="201" fill="#2d3142" font-size="10" font-family="'Geist Mono', monospace" font-weight="600">f = 0.01</text>
+      <text x="996" y="214" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">1% cheats</text>
+
+      <rect x="988" y="466" width="84" height="14" rx="2" fill="#f5f5f5"/>
+      <text x="996" y="477" fill="#7a8399" font-size="10" font-family="'Geist Mono', monospace" font-weight="600">f = 0.001</text>
+      <text x="996" y="490" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">0.1% cheats</text>
+
+      <!-- =============================================================
+           WORKED-EXAMPLE MARKER on f=0.01 curve at (k=100, P=0.634)
+           Plot coords: x = 540, y = 287
+           ============================================================= -->
+      <!-- Halo -->
+      <circle cx="540" cy="287" r="7" fill="#f5f5f5" stroke="#059669" stroke-width="1" opacity="0.5"/>
+      <!-- Dot -->
+      <circle cx="540" cy="287" r="4" fill="#059669"/>
+
+      <!-- Crosshair to axes -->
+      <line x1="540" y1="287" x2="540" y2="540" stroke="#059669" stroke-width="0.8" stroke-dasharray="3,3"/>
+      <line x1="540" y1="287" x2="100" y2="287" stroke="#059669" stroke-width="0.8" stroke-dasharray="3,3"/>
+
+      <!-- Worked-example callout (top-right of plot) -->
+      <rect x="608" y="180" width="356" height="78" rx="6"
+            fill="#f5f5f5" stroke="#059669" stroke-width="1"/>
+      <rect x="616" y="188" width="56" height="14" rx="2" fill="transparent" stroke="rgba(5,150,105,0.50)" stroke-width="0.8"/>
+      <text x="644" y="198" fill="#059669" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">EXAMPLE</text>
+
+      <text x="616" y="220" fill="#2d3142" font-size="14" font-family="'Geist', sans-serif" font-style="italic">f = 0.01, k = 100  →  P[catch] = 0.634</text>
+      <text x="616" y="240" fill="#4f5d75" font-size="10" font-family="'Geist Mono', monospace">per cycle</text>
+      <text x="616" y="252" fill="#4f5d75" font-size="10" font-family="'Geist Mono', monospace">over 1 year  →  P[ever caught] ≈ 1 − 6 × 10⁻²³</text>
+
+      <!-- Connector from callout to dot -->
+      <path d="M 616 224 Q 580 256 544 287" fill="none" stroke="rgba(5,150,105,0.50)" stroke-width="0.8" stroke-dasharray="3,3"/>
+
+      <!-- =============================================================
+           THE FORMULA (display equation, top-left of plot region)
+           ============================================================= -->
+      <rect x="120" y="156" width="288" height="48" rx="4" fill="#f5f5f5"/>
+      <text x="124" y="172" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">SOUNDNESS LEMMA</text>
+      <text x="124" y="196" fill="#2d3142" font-size="20" font-family="'Geist', sans-serif" font-style="italic">
+        P[catch] = 1 − (1 − f)<tspan dy="-8" font-size="14">k</tspan>
+      </text>
+
+      <!-- =============================================================
+           BOTTOM ANNOTATION STRIP — three takeaways
+           ============================================================= -->
+      <line x1="100" y1="616" x2="1100" y2="616" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+
+      <g transform="translate(100, 636)">
+        <text x="0"   y="0"  fill="#4f5d75" font-size="8"  font-family="'Geist Mono', monospace" letter-spacing="0.18em">FREQUENT CHEATING</text>
+        <text x="0"   y="22" fill="#2d3142" font-size="14" font-family="'Geist', sans-serif" font-weight="600">caught in tens of probes</text>
+        <text x="0"   y="42" fill="#4f5d75" font-size="10" font-family="'Geist Mono', monospace">f = 0.1   ·   k = 30  →  96 %</text>
+
+        <text x="364" y="0"  fill="#059669" font-size="8"  font-family="'Geist Mono', monospace" letter-spacing="0.18em" font-weight="600">RARE CHEATING (the threat model)</text>
+        <text x="364" y="22" fill="#2d3142" font-size="14" font-family="'Geist', sans-serif" font-weight="600">still caught — slowly, then certainly</text>
+        <text x="364" y="42" fill="#4f5d75" font-size="10" font-family="'Geist Mono', monospace">f = 0.01  ·  k = 100  →  63.4 % per cycle</text>
+
+        <text x="744" y="0"  fill="#4f5d75" font-size="8"  font-family="'Geist Mono', monospace" letter-spacing="0.18em">YEARLY HORIZON</text>
+        <text x="744" y="22" fill="#2d3142" font-size="14" font-family="'Geist', sans-serif" font-weight="600">escape probability vanishes</text>
+        <text x="744" y="42" fill="#4f5d75" font-size="10" font-family="'Geist Mono', monospace">≈ 6 × 10⁻²³  ·  smaller than guessing a key</text>
+      </g>
+
+      <!-- =============================================================
+           LEGEND — at very bottom
+           ============================================================= -->
+      <line x1="100" y1="708" x2="1100" y2="708" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <text x="100" y="728" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+
+      <line x1="180" y1="724" x2="216" y2="724" stroke="#059669" stroke-width="1.8"/>
+      <text x="224" y="728" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">f = 0.1  ·  highest cheating rate</text>
+
+      <line x1="468" y1="724" x2="504" y2="724" stroke="#2d3142" stroke-width="1.6"/>
+      <text x="512" y="728" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">f = 0.01  ·  worked example</text>
+
+      <line x1="748" y1="724" x2="784" y2="724" stroke="#7a8399" stroke-width="1.4" stroke-dasharray="3,3"/>
+      <text x="792" y="728" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">f = 0.001  ·  near-honest issuer</text>
+
+      <circle cx="1024" cy="724" r="4" fill="#059669"/>
+      <text x="1036" y="728" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">worked point</text>
+    </svg>
+  </div>
+</body>
+</html>

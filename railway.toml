@@ -1,2 +1,5 @@
-[build]
-dockerfilePath = "Dockerfile"
+# Per-service Dockerfile paths are set via each service's
+# RAILWAY_DOCKERFILE_PATH env var (ocx-server defaults to Dockerfile;
+# ocx-api uses api/Dockerfile). This file intentionally does NOT pin a
+# project-wide dockerfilePath because that would override per-service
+# settings.

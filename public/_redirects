@@ -1,0 +1,7 @@
+# API proxy — forward /api/* to the Railway backend (server-side, no CORS).
+# Pass-through: frontend already includes /v1/ in its paths, so we just
+# strip the /api prefix. MUST come before the SPA catchall below.
+/api/*  https://ocx-api-production.up.railway.app/:splat  200
+
+# SPA — let React Router handle all paths
+/*    /index.html   200

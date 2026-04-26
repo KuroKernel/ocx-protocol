@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCX vs zkML / TEEs / Audit Logs / CT · Quadrant</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:  #f5f5f5;
+      --color-ink:    #2d3142;
+      --color-muted:  #4f5d75;
+      --color-soft:   #7a8399;
+      --color-accent: #059669;
+      --font-sans:    'Geist', system-ui, sans-serif;
+      --font-serif:   'Geist', sans-serif;
+      --font-mono:    'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 3rem 1.5rem;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem; font-weight: 500;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-sans);
+      font-size: clamp(1.75rem, 2.6vw + 0.75rem, 2.25rem);
+      font-weight: 400; letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      color: var(--color-muted);
+      margin-bottom: 1.75rem;
+      max-width: 720px;
+      line-height: 1.5;
+    }
+    svg { width: 100%; min-width: 960px; display: block; }
+    /* Mobile-embed adjustments — tighten chrome so the diagram fills
+       more of the 1080px-wide iframe the parent component renders. */
+    @media (max-width: 720px) {
+      body { padding: 1.25rem 1rem 2rem; }
+      .frame { max-width: 100%; }
+      h1 { font-size: 1.25rem !important; line-height: 1.2 !important; margin-bottom: 0.35rem !important; }
+      .subtitle { font-size: 0.85rem !important; margin-bottom: 1rem !important; }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Comparison · Verifiable AI</p>
+    <h1>Where each approach sits</h1>
+    <p class="subtitle">Two questions decide a verification scheme: how long does it take to verify, and who do you have to trust to believe the answer? Most approaches fail one of these. OCX is the only one that wins both.</p>
+
+    <svg viewBox="0 0 1120 820" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow-axis-end" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#2d3142"/>
+        </marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+      <!-- =============================================================
+           FOCAL QUADRANT TINT — lower-left (fast + trustless)
+           Plot bounds: x = 100..1000, y = 120..640
+           Center: (550, 380)
+           Lower-left quadrant: x in [100..550], y in [380..640]
+           ============================================================= -->
+      <rect x="100" y="380" width="450" height="260" fill="rgba(5,150,105,0.04)"/>
+
+      <!-- Quadrant corner tags (small) -->
+      <text x="120" y="148" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">FAST · DEPENDENT</text>
+      <text x="980" y="148" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em" text-anchor="end">SLOW · DEPENDENT</text>
+      <text x="120" y="628" fill="#059669" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em" font-weight="600">FAST · TRUSTLESS  ·  THE WIN</text>
+      <text x="980" y="628" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em" text-anchor="end">SLOW · TRUSTLESS</text>
+
+      <!-- =============================================================
+           AXIS CROSS — x: y=380, y: x=550
+           ============================================================= -->
+      <!-- Y-axis (vertical), high to low trust -->
+      <line x1="550" y1="100" x2="550" y2="660" stroke="#2d3142" stroke-width="1.2" marker-end="url(#arrow-axis-end)"/>
+      <line x1="550" y1="100" x2="550" y2="100" stroke="#2d3142" stroke-width="1.2"/>
+      <!-- X-axis (horizontal) -->
+      <line x1="80"  y1="380" x2="1020" y2="380" stroke="#2d3142" stroke-width="1.2" marker-end="url(#arrow-axis-end)"/>
+
+      <!-- Top of Y-axis cap mark -->
+      <line x1="544" y1="100" x2="556" y2="100" stroke="#2d3142" stroke-width="1.2"/>
+      <!-- Left of X-axis cap mark -->
+      <line x1="80" y1="374" x2="80" y2="386" stroke="#2d3142" stroke-width="1.2"/>
+
+      <!-- Axis labels (Jobs-minimal: one word, no glyphs) -->
+      <text x="550" y="84"  fill="#2d3142" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.18em">DEPENDENT</text>
+      <text x="550" y="688" fill="#2d3142" font-size="10" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.18em">TRUSTLESS</text>
+      <text x="68"  y="384" fill="#2d3142" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.18em" dominant-baseline="middle">MICROSECONDS</text>
+      <text x="1032" y="384" fill="#2d3142" font-size="10" font-family="'Geist Mono', monospace" text-anchor="start" letter-spacing="0.18em" dominant-baseline="middle">MINUTES</text>
+
+      <!-- Axis dimension labels (subtler — explains what each axis measures) -->
+      <text x="538" y="100" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.14em">TRUST →</text>
+      <text x="1020" y="404" fill="#7a8399" font-size="8" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.14em">VERIFICATION COST →</text>
+
+      <!-- =============================================================
+           ITEM 1 · OCX (focal)
+           Position: lower-left, deep in the win zone (260, 528)
+           ============================================================= -->
+      <!-- Halo -->
+      <circle cx="260" cy="528" r="11" fill="rgba(5,150,105,0.10)" stroke="#059669" stroke-width="1" opacity="0.6"/>
+      <circle cx="260" cy="528" r="5" fill="#059669"/>
+      <!-- Label box (paper-mask) to the right -->
+      <rect x="276" y="510" width="172" height="44" rx="4" fill="#f5f5f5" stroke="#059669" stroke-width="1"/>
+      <text x="284" y="526" fill="#059669" font-size="13" font-family="'Geist', sans-serif" font-weight="600">OCX</text>
+      <text x="284" y="540" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">79 µs offline · 200 B</text>
+      <text x="284" y="552" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">trust = Ed25519 only</text>
+
+      <!-- =============================================================
+           ITEM 2 · TEEs (SGX / SEV) — upper-left (fast verify, vendor trust)
+           Position: (260, 220)
+           ============================================================= -->
+      <circle cx="260" cy="220" r="5" fill="#2d3142"/>
+      <rect x="276" y="200" width="200" height="44" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.30)" stroke-width="0.8"/>
+      <text x="284" y="216" fill="#2d3142" font-size="13" font-family="'Geist', sans-serif" font-weight="600">TEE attestation</text>
+      <text x="284" y="230" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">SGX · SEV · TDX · Nitro</text>
+      <text x="284" y="242" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">trust = chip vendor + firmware</text>
+
+      <!-- =============================================================
+           ITEM 3 · zkML — far right of plot (proving cost dominates)
+           Position: (820, 540) — slow + trustless
+           ============================================================= -->
+      <circle cx="820" cy="540" r="5" fill="#2d3142"/>
+      <rect x="660" y="556" width="240" height="44" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.30)" stroke-width="0.8"/>
+      <text x="668" y="572" fill="#2d3142" font-size="13" font-family="'Geist', sans-serif" font-weight="600">zkML</text>
+      <text x="668" y="586" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">EZKL · Halo2 · proving in minutes</text>
+      <text x="668" y="598" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">trustless math · toy-scale models</text>
+
+      <!-- =============================================================
+           ITEM 4 · Audit logs / SIEM — far right, mid trust band
+           Position: (880, 280) — slow forensic + some trust in log integrity
+           ============================================================= -->
+      <circle cx="880" cy="280" r="5" fill="#2d3142"/>
+      <rect x="700" y="240" width="220" height="44" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.30)" stroke-width="0.8"/>
+      <text x="708" y="256" fill="#2d3142" font-size="13" font-family="'Geist', sans-serif" font-weight="600">Audit logs · SIEM</text>
+      <text x="708" y="270" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">post-hoc · forensic search</text>
+      <text x="708" y="282" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">trust = log producer</text>
+
+      <!-- =============================================================
+           ITEM 5 · Certificate Transparency — middle-low, fast, trustless-ish
+           Position: (380, 472) — but only for certificates, not arbitrary compute
+           ============================================================= -->
+      <circle cx="380" cy="472" r="5" fill="#2d3142"/>
+      <rect x="220" y="436" width="232" height="32" rx="4" fill="#f5f5f5" stroke="rgba(45,49,66,0.30)" stroke-width="0.8"/>
+      <text x="228" y="452" fill="#2d3142" font-size="12" font-family="'Geist', sans-serif" font-weight="600">Certificate Transparency</text>
+      <text x="228" y="464" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">trustless · certs only · not compute</text>
+
+      <!-- Connector from CT label to dot -->
+      <line x1="380" y1="468" x2="380" y2="472" stroke="rgba(45,49,66,0.30)" stroke-width="0.6" stroke-dasharray="2,2"/>
+
+      <!-- =============================================================
+           EDITORIAL ANNOTATION — italic Instrument Serif
+           ============================================================= -->
+      <text x="120" y="592" fill="#2d3142" font-size="14" font-family="'Geist', sans-serif" font-style="italic">only one approach reaches the lower-left</text>
+
+      <!-- =============================================================
+           BOTTOM SUMMARY STRIP
+           ============================================================= -->
+      <line x1="100" y1="708" x2="1020" y2="708" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+
+      <g transform="translate(100, 728)">
+        <text x="0"   y="0"  fill="#4f5d75" font-size="8"  font-family="'Geist Mono', monospace" letter-spacing="0.18em">UPPER ZONE</text>
+        <text x="0"   y="22" fill="#2d3142" font-size="13" font-family="'Geist', sans-serif" font-weight="600">trust someone</text>
+        <text x="0"   y="42" fill="#4f5d75" font-size="10" font-family="'Geist Mono', monospace">vendor · operator · log keeper</text>
+
+        <text x="240" y="0"  fill="#4f5d75" font-size="8"  font-family="'Geist Mono', monospace" letter-spacing="0.18em">RIGHT ZONE</text>
+        <text x="240" y="22" fill="#2d3142" font-size="13" font-family="'Geist', sans-serif" font-weight="600">pay seconds-to-minutes</text>
+        <text x="240" y="42" fill="#4f5d75" font-size="10" font-family="'Geist Mono', monospace">per check · scales poorly</text>
+
+        <text x="500" y="0"  fill="#059669" font-size="8"  font-family="'Geist Mono', monospace" letter-spacing="0.18em" font-weight="600">LOWER-LEFT  ·  THE WIN</text>
+        <text x="500" y="22" fill="#2d3142" font-size="13" font-family="'Geist', sans-serif" font-weight="600">trust math, pay microseconds</text>
+        <text x="500" y="42" fill="#4f5d75" font-size="10" font-family="'Geist Mono', monospace">scales linearly with verifier hardware</text>
+
+        <text x="800" y="0"  fill="#4f5d75" font-size="8"  font-family="'Geist Mono', monospace" letter-spacing="0.18em">DECISION</text>
+        <text x="800" y="22" fill="#059669" font-size="20" font-family="'Geist', sans-serif" font-weight="400">choose OCX</text>
+        <text x="800" y="42" fill="#4f5d75" font-size="10" font-family="'Geist Mono', monospace">when both axes matter</text>
+      </g>
+
+      <!-- =============================================================
+           LEGEND (kept tight)
+           ============================================================= -->
+      <line x1="100" y1="788" x2="1020" y2="788" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <text x="100" y="808" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+
+      <circle cx="184" cy="804" r="5" fill="#059669"/>
+      <text x="196" y="808" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">OCX (focal)</text>
+
+      <circle cx="320" cy="804" r="5" fill="#2d3142"/>
+      <text x="332" y="808" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Comparable approach</text>
+
+      <rect x="500" y="800" width="14" height="8" fill="rgba(5,150,105,0.04)"/>
+      <text x="520" y="808" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Dominant quadrant tint</text>
+
+      <text x="744" y="808" fill="#7a8399" font-size="9" font-family="'Geist', sans-serif">Distance from origin = combined cost · lower-left wins</text>
+    </svg>
+  </div>
+</body>
+</html>

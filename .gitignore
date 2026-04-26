@@ -176,3 +176,11 @@ bench.out
 *.cbor.tmp
 receipt_*.cbor
 test_receipt_*
+
+# Local-only docs (never committed; for personal reference)
+whitepaper/paper-explained.md
+*.local.md
+api/.venv/
+src.backup-*/
+public.backup-*/
+api/.env

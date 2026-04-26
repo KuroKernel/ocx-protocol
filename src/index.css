@@ -1,0 +1,218 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Base — global rules that govern the entire app.
+   Mobile-first; desktop is the polite extension.
+   ============================================================ */
+@layer base {
+  html {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%; /* prevent iOS portrait→landscape font enlargement */
+    -webkit-tap-highlight-color: transparent; /* kill the blue flash on every tap */
+    font-feature-settings: "ss01", "ss02", "cv11";
+    scroll-behavior: smooth;
+  }
+  body {
+    font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    background-color: #FCFCFC;
+    color: #141414;
+    overscroll-behavior-y: none; /* no rubber-band white-flash on iOS overscroll */
+  }
+  ::selection {
+    background-color: #141414;
+    color: #FCFCFC;
+  }
+  hr {
+    border: 0;
+    border-top: 1px solid #E4E4E4;
+  }
+
+  /* ----------------------------------------------------------
+     Form inputs — iOS will zoom into any input with font-size
+     under 16px on focus. That zoom is THE tell of a non-native
+     mobile site. Bake 16px into the base of every editable
+     control; let class overrides bring it down on desktop only.
+     ---------------------------------------------------------- */
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+  }
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+  @media (min-width: 768px) {
+    input,
+    textarea,
+    select {
+      font-size: inherit;
+    }
+  }
+
+  /* ----------------------------------------------------------
+     Focus states — mouse/keyboard users get a clear ink ring;
+     touch users see nothing (focus-visible handles the split).
+     ---------------------------------------------------------- */
+  :focus { outline: none; }
+  :focus-visible {
+    outline: 2px solid #141414;
+    outline-offset: 3px;
+    border-radius: 1px;
+  }
+
+  /* ----------------------------------------------------------
+     Reduced motion — respect the OS setting. Animations and
+     parallax scroll effects collapse to instant transitions.
+     ---------------------------------------------------------- */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ============================================================
+   Components — reusable patterns that show up across pages.
+   ============================================================ */
+@layer components {
+  /* Containers — generous on desktop, tight on mobile so we don't
+     waste 64px of phone width on padding. Designed for ultrawide
+     monitors at the top end. Includes safe-area insets for the
+     iPhone notch on landscape and rounded-corner home indicators. */
+  .container-tight {
+    max-width: 720px; /* equals tailwind's screen-reading */
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: max(1.25rem, env(safe-area-inset-left));
+    padding-right: max(1.25rem, env(safe-area-inset-right));
+  }
+  .container-wide {
+    max-width: 1280px; /* equals tailwind's screen-wide */
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: max(1.25rem, env(safe-area-inset-left));
+    padding-right: max(1.25rem, env(safe-area-inset-right));
+  }
+  @media (min-width: 640px) {
+    .container-tight,
+    .container-wide {
+      padding-left: max(2rem, env(safe-area-inset-left));
+      padding-right: max(2rem, env(safe-area-inset-right));
+    }
+  }
+  @media (min-width: 1024px) {
+    .container-tight,
+    .container-wide {
+      padding-left: max(3rem, env(safe-area-inset-left));
+      padding-right: max(3rem, env(safe-area-inset-right));
+    }
+  }
+
+  /* Wordmark — used in header/footer */
+  .wordmark {
+    font-family: "Geist", -apple-system, system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.045em;
+    color: #141414;
+  }
+
+  /* Section labels — used SPARINGLY (max 2-3 across whole page) */
+  .label {
+    @apply text-[11px] uppercase tracking-[0.22em] text-stone-500 font-medium;
+  }
+
+  /* ----------------------------------------------------------
+     Buttons — mobile-first sizing.
+     • min-height 48px → comfortable thumb target on every device
+     • active:scale gives a haptic-ish press confirmation
+     • Disabled has no cursor-not-allowed (touch ignores it)
+     ---------------------------------------------------------- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 text-[15px] font-medium border border-ink bg-ink text-paper transition-[background-color,transform] duration-150 ease-out;
+    min-height: 48px;
+    touch-action: manipulation; /* eliminates the 300ms double-tap zoom delay on iOS */
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .btn:hover { background-color: #2A2A2A; }
+  .btn:active:not(:disabled) { transform: scale(0.985); }
+  .btn:disabled { opacity: 0.4; }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 text-[15px] font-medium border border-stone-300 text-ink bg-paper transition-[background-color,border-color,transform] duration-150 ease-out;
+    min-height: 48px;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .btn-ghost:hover { border-color: #141414; background-color: #F2F2F2; }
+  .btn-ghost:active:not(:disabled) { transform: scale(0.985); }
+  .btn-ghost:disabled { opacity: 0.4; }
+
+  /* Inline link */
+  .link {
+    @apply text-ink underline underline-offset-[6px] decoration-stone-300 hover:decoration-ink transition-colors duration-150;
+  }
+  .link-mute {
+    @apply text-stone-600 hover:text-ink transition-colors duration-150;
+    touch-action: manipulation;
+  }
+
+  /* ----------------------------------------------------------
+     Code blocks — the artifact IS the design.
+     Mobile: smaller padding, smaller font, momentum scroll.
+     Desktop: roomy.
+     ---------------------------------------------------------- */
+  .code-block {
+    @apply bg-ash border border-stone-200 p-5 sm:p-7 lg:p-10 font-mono text-[12px] sm:text-[13px] leading-[1.85] text-ink overflow-auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .code-inline {
+    @apply font-mono text-[0.92em] text-ink;
+  }
+
+  /* Mono numerals — for hashes, hex, technical data */
+  .mono {
+    font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-feature-settings: "ss01", "ss02", "calt", "zero";
+  }
+}
+
+/* ============================================================
+   Utilities — small mobile helpers.
+   ============================================================ */
+@layer utilities {
+  /* Use this on the hero so the address bar collapsing doesn't
+     yank content. Falls back to vh on browsers without dvh. */
+  .min-h-screen-safe {
+    min-height: 78vh;
+  }
+  @supports (min-height: 78dvh) {
+    .min-h-screen-safe {
+      min-height: 78dvh;
+    }
+  }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+
+  /* For horizontal-scroll containers (diagrams, code blocks).
+     iOS Safari sometimes drops momentum scroll without the prefix. */
+  .scroll-touch {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+}

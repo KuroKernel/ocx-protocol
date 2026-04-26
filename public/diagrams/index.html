@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCX Diagrams · Index</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --paper:  #f5f5f5;
+      --paper2: #ececec;
+      --ink:    #2d3142;
+      --muted:  #4f5d75;
+      --soft:   #7a8399;
+      --accent: #059669;
+      --rule:   rgba(45,49,66,0.12);
+    }
+    body {
+      font-family: 'Geist', system-ui, sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      padding: 3rem 2rem 6rem;
+    }
+    header { max-width: 1320px; margin: 0 auto 2.5rem; }
+    .eyebrow {
+      font-family: 'Geist Mono', ui-monospace, monospace;
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: 'Instrument Serif', serif;
+      font-size: clamp(2rem, 3vw + 1rem, 2.75rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin-bottom: 0.75rem;
+    }
+    .lede {
+      max-width: 720px;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.55;
+    }
+    .stack {
+      max-width: 1320px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2.5rem;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--rule);
+      background: var(--paper2);
+    }
+    .card-head .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: 'Geist Mono', ui-monospace, monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .card-head .tag .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--accent);
+    }
+    .card-head h2 {
+      font-family: 'Instrument Serif', serif;
+      font-weight: 400;
+      font-size: 1.4rem;
+      letter-spacing: -0.01em;
+      flex: 1;
+      margin: 0 1.5rem;
+    }
+    .card-head a {
+      font-family: 'Geist Mono', ui-monospace, monospace;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-decoration: none;
+      border: 1px solid var(--rule);
+      padding: 0.4rem 0.7rem;
+      border-radius: 4px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .card-head a:hover { color: var(--accent); border-color: var(--accent); }
+    .card iframe {
+      width: 100%;
+      height: 880px;
+      border: 0;
+      display: block;
+      background: var(--paper);
+    }
+    /* taller frames for the longer diagrams */
+    .card.tall iframe { height: 1100px; }
+    footer {
+      max-width: 1320px;
+      margin: 4rem auto 0;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--rule);
+      font-family: 'Geist Mono', ui-monospace, monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--soft);
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">OCX · Visual Spec</p>
+    <h1>Six diagrams for the protocol</h1>
+    <p class="lede">Each frame is a standalone HTML file — open it in a new tab to see at full resolution. Click the file path on the right of any header to jump straight to it.</p>
+  </header>
+
+  <main class="stack">
+
+    <section class="card">
+      <div class="card-head">
+        <span class="tag"><span class="dot"></span> 01 · Sequence</span>
+        <h2>One inference call, signed once, verifiable forever</h2>
+        <a href="01-sequence-inference-flow.html" target="_blank">open ↗</a>
+      </div>
+      <iframe src="01-sequence-inference-flow.html" loading="lazy" title="OCX inference sequence"></iframe>
+    </section>
+
+    <section class="card tall">
+      <div class="card-head">
+        <span class="tag"><span class="dot"></span> 02 · Threat Model</span>
+        <h2>What OCX trusts, what it does not</h2>
+        <a href="02-threat-model.html" target="_blank">open ↗</a>
+      </div>
+      <iframe src="02-threat-model.html" loading="lazy" title="OCX threat model"></iframe>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <span class="tag"><span class="dot"></span> 03 · Determinism Matrix</span>
+        <h2>Bit-exact across model × hardware</h2>
+        <a href="03-determinism-matrix.html" target="_blank">open ↗</a>
+      </div>
+      <iframe src="03-determinism-matrix.html" loading="lazy" title="Determinism matrix"></iframe>
+    </section>
+
+    <section class="card tall">
+      <div class="card-head">
+        <span class="tag"><span class="dot"></span> 04 · Soundness Curve</span>
+        <h2>Cheating gets exponentially harder, fast</h2>
+        <a href="04-soundness-curve.html" target="_blank">open ↗</a>
+      </div>
+      <iframe src="04-soundness-curve.html" loading="lazy" title="Soundness curve"></iframe>
+    </section>
+
+    <section class="card tall">
+      <div class="card-head">
+        <span class="tag"><span class="dot"></span> 05 · Receipt Structure</span>
+        <h2>What's inside the 200 bytes</h2>
+        <a href="05-receipt-structure.html" target="_blank">open ↗</a>
+      </div>
+      <iframe src="05-receipt-structure.html" loading="lazy" title="Receipt structure"></iframe>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <span class="tag"><span class="dot"></span> 06 · Comparison</span>
+        <h2>Where each approach sits</h2>
+        <a href="06-comparison-quadrant.html" target="_blank">open ↗</a>
+      </div>
+      <iframe src="06-comparison-quadrant.html" loading="lazy" title="Comparison quadrant"></iframe>
+    </section>
+
+  </main>
+
+  <footer>
+    <span>OCX · diagram set v1</span>
+    <span>self-contained · no JS · no external images</span>
+  </footer>
+</body>
+</html>

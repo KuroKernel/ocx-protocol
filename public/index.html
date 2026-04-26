@@ -1,30 +1,81 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0B0C0E" />
-    <meta name="description" content="OCX Protocol - Mathematical proof for computational integrity" />
-    <title>OCX Protocol - Mathematical proof for computational integrity</title>
-    <link rel="icon" type="image/svg+xml" href="/assets/logos/ocx-symbol-only.svg" />
-    <link rel="apple-touch-icon" href="/assets/logos/ocx-symbol-only.svg" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              'ocx-dark': '#0B0C0E',
-              'ocx-gray': '#1F2937',
-              'ocx-light': '#F5F7FA',
-              'ocx-blue': '#6366F1'
-            }
-          }
-        }
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=yes"
+    />
+    <meta name="theme-color" content="#FCFCFC" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#FCFCFC" />
+    <meta name="color-scheme" content="light" />
+
+    <!-- iOS / iPadOS home-screen behaviour -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="OCX" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <title>OCX — A protocol for verifiable AI inference</title>
+    <meta
+      name="description"
+      content="Cryptographic receipts for AI inference. Byte-identical outputs from frontier-scale models. 200-byte signed receipts. Offline verification in microseconds."
+    />
+
+    <link rel="canonical" href="https://ocx.world" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ocx.world" />
+    <meta property="og:title" content="OCX — A protocol for verifiable AI inference" />
+    <meta
+      property="og:description"
+      content="Cryptographic receipts for AI inference. Byte-identical outputs from frontier-scale models. Offline verification in microseconds."
+    />
+    <meta property="og:image" content="https://ocx.world/favicon.svg" />
+    <meta name="twitter:card" content="summary" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <!--
+      Tiny inline pre-paint CSS — covers the first frame before tailwind loads.
+      Prevents flash-of-white on cold loads and locks scroll behaviour
+      to match the rest of the site.
+    -->
+    <style>
+      :root {
+        --paper: #fcfcfc;
+        --ink: #141414;
       }
-    </script>
+      html {
+        background-color: var(--paper);
+        color: var(--ink);
+        text-rendering: optimizeLegibility;
+        -webkit-text-size-adjust: 100%;
+        -webkit-font-smoothing: antialiased;
+        -webkit-tap-highlight-color: transparent;
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background-color: var(--paper);
+        color: var(--ink);
+        overscroll-behavior-y: none;
+      }
+      @supports (height: 100dvh) {
+        html, body { min-height: 100dvh; }
+      }
+    </style>
   </head>
-  <body>
+  <body class="bg-paper text-ink antialiased">
+    <noscript>This site requires JavaScript to run.</noscript>
     <div id="root"></div>
   </body>
 </html>

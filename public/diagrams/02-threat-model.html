@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCX Threat Model · Trust Boundaries</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-soft:    #7a8399;
+      --color-accent:  #059669;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Geist', sans-serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 3rem 1.5rem;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem; font-weight: 500;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-sans);
+      font-size: clamp(1.75rem, 2.6vw + 0.75rem, 2.25rem);
+      font-weight: 400; letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      color: var(--color-muted);
+      margin-bottom: 1.75rem;
+      max-width: 720px;
+      line-height: 1.5;
+    }
+    svg { width: 100%; min-width: 960px; display: block; }
+    /* Mobile-embed adjustments — tighten chrome so the diagram fills
+       more of the 1080px-wide iframe the parent component renders. */
+    @media (max-width: 720px) {
+      body { padding: 1.25rem 1rem 2rem; }
+      .frame { max-width: 100%; }
+      h1 { font-size: 1.25rem !important; line-height: 1.2 !important; margin-bottom: 0.35rem !important; }
+      .subtitle { font-size: 0.85rem !important; margin-bottom: 1rem !important; }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Figure 1 · Threat Model</p>
+    <h1>What OCX trusts, what it does not</h1>
+    <p class="subtitle">Three concentric zones. The innermost is unconditionally trusted: standard cryptographic primitives. The middle is the OCX construction itself. The outermost is the adversary's full reach. Every claim OCX makes reduces to: <em>can the adversary cross the boundary into the inner zone?</em></p>
+
+    <svg viewBox="0 0 1200 760" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/>
+        </marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#059669"/>
+        </marker>
+        <marker id="arrow-block" markerWidth="9" markerHeight="9" refX="4" refY="4" orient="auto">
+          <line x1="0" y1="0" x2="8" y2="8" stroke="#991B1B" stroke-width="1.5"/>
+          <line x1="0" y1="8" x2="8" y2="0" stroke="#991B1B" stroke-width="1.5"/>
+        </marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+      <!-- =============================================================
+           RING 1 (outermost) — Adversary's reach (dashed, muted)
+           ============================================================= -->
+      <rect x="40"  y="80"  width="1120" height="600" rx="8"
+            fill="rgba(45,49,66,0.018)"
+            stroke="rgba(45,49,66,0.32)" stroke-width="1" stroke-dasharray="6,4"/>
+
+      <!-- =============================================================
+           RING 2 (middle) — OCX construction
+           ============================================================= -->
+      <rect x="120" y="148" width="960" height="464" rx="8"
+            fill="rgba(45,49,66,0.025)"
+            stroke="#4f5d75" stroke-width="1"/>
+
+      <!-- =============================================================
+           RING 3 (innermost / focal) — Trusted primitives (emerald)
+           ============================================================= -->
+      <rect x="280" y="248" width="640" height="264" rx="8"
+            fill="rgba(5,150,105,0.06)"
+            stroke="#059669" stroke-width="1.2"/>
+
+      <!-- =============================================================
+           RING LABELS (paper-masked over the ring's top border)
+           ============================================================= -->
+      <rect x="56"  y="72"  width="296" height="16" fill="#f5f5f5"/>
+      <text x="64"  y="84"  fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">ZONE 3 · ADVERSARY · NOT TRUSTED</text>
+
+      <rect x="136" y="140" width="248" height="16" fill="#f5f5f5"/>
+      <text x="144" y="152" fill="#2d3142" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">ZONE 2 · OCX CONSTRUCTION</text>
+
+      <rect x="296" y="240" width="280" height="16" fill="#f5f5f5"/>
+      <text x="304" y="252" fill="#059669" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em" font-weight="600">ZONE 1 · TRUSTED PRIMITIVES</text>
+
+      <!-- =============================================================
+           ZONE 1 (inner) — what we trust unconditionally
+           ============================================================= -->
+      <text x="600" y="288" fill="#2d3142" font-size="14" font-family="'Geist', sans-serif" font-style="italic" text-anchor="middle">if these break, all of cryptography breaks</text>
+
+      <!-- 4 primitives in a 2×2 grid -->
+      <g transform="translate(312, 312)">
+        <text x="0"   y="0"  fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Ed25519</text>
+        <text x="0"   y="14" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">RFC 8032 · 64 B sig · 32 B key</text>
+
+        <text x="320" y="0"  fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">SHA-256</text>
+        <text x="320" y="14" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">FIPS 180-4 · 256-bit digest</text>
+
+        <text x="0"   y="64" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Canonical CBOR</text>
+        <text x="0"   y="78" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">RFC 8949 § 4.2 · deterministic encoding</text>
+
+        <text x="320" y="64" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Deterministic re-execution</text>
+        <text x="320" y="78" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">pinned env · bit-exact forward pass</text>
+      </g>
+
+      <text x="600" y="488" fill="#059669" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">REDUCED TO MATH · NO IMPLEMENTATION ASSUMPTIONS</text>
+
+      <!-- =============================================================
+           ZONE 2 (middle) — what OCX itself contributes
+           ============================================================= -->
+      <text x="600" y="184" fill="#2d3142" font-size="14" font-family="'Geist', sans-serif" font-style="italic" text-anchor="middle">imports Zone 1, exposed to Zone 3</text>
+
+      <!-- Three columns of OCX contributions (above the inner ring) -->
+      <g transform="translate(160, 208)">
+        <text x="0"   y="0"  fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif">200-byte receipt</text>
+        <text x="0"   y="14" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">11 CBOR fields + sig</text>
+
+        <text x="288" y="0"  fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Witness re-execution</text>
+        <text x="288" y="14" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">k probes per cycle</text>
+
+        <text x="576" y="0"  fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Soundness lemma</text>
+        <text x="576" y="14" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">P[catch] = 1 − (1−f)<tspan dy="-3" font-size="7">k</tspan></text>
+      </g>
+
+      <!-- Three more in the bottom band of zone 2 (below the inner ring) -->
+      <g transform="translate(160, 552)">
+        <text x="0"   y="0"  fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Public-key registry</text>
+        <text x="0"   y="14" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">issuer keys · /security/keys</text>
+
+        <text x="288" y="0"  fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Domain separator</text>
+        <text x="288" y="14" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">"OCX-RECEIPT-V1"</text>
+
+        <text x="576" y="0"  fill="#2d3142" font-size="11" font-weight="600" font-family="'Geist', sans-serif">7 KB libocx-verify</text>
+        <text x="576" y="14" fill="#4f5d75" font-size="9"  font-family="'Geist Mono', monospace">no_std Rust · runs anywhere</text>
+      </g>
+
+      <!-- =============================================================
+           ZONE 3 (outer) — Adversary capabilities
+           ============================================================= -->
+      <!-- Top band of zone 3 (above zone 2's top edge) -->
+      <g transform="translate(80, 112)">
+        <text x="0"   y="0"  fill="#7a8399" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Hardware vendor</text>
+        <text x="0"   y="14" fill="#7a8399" font-size="9"  font-family="'Geist Mono', monospace">backdoored chips · TEE breaks</text>
+
+        <text x="288" y="0"  fill="#7a8399" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Issuer dishonesty</text>
+        <text x="288" y="14" fill="#7a8399" font-size="9"  font-family="'Geist Mono', monospace">picks which calls to compute honestly</text>
+
+        <text x="576" y="0"  fill="#7a8399" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Network attacker</text>
+        <text x="576" y="14" fill="#7a8399" font-size="9"  font-family="'Geist Mono', monospace">MITM · replay · DoS · censoring</text>
+
+        <text x="864" y="0"  fill="#7a8399" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Insider operator</text>
+        <text x="864" y="14" fill="#7a8399" font-size="9"  font-family="'Geist Mono', monospace">root on issuer · HSM custodian</text>
+      </g>
+
+      <!-- Bottom band of zone 3 (below zone 2's bottom edge) -->
+      <g transform="translate(80, 632)">
+        <text x="0"   y="0"  fill="#7a8399" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Side channels</text>
+        <text x="0"   y="14" fill="#7a8399" font-size="9"  font-family="'Geist Mono', monospace">timing · power · cache · spectre-class</text>
+
+        <text x="288" y="0"  fill="#7a8399" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Compromised CA / DNS</text>
+        <text x="288" y="14" fill="#7a8399" font-size="9"  font-family="'Geist Mono', monospace">cert authority · BGP hijack</text>
+
+        <text x="576" y="0"  fill="#7a8399" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Future quantum adversary</text>
+        <text x="576" y="14" fill="#7a8399" font-size="9"  font-family="'Geist Mono', monospace">Shor on Ed25519 · post-quantum migration</text>
+
+        <text x="864" y="0"  fill="#7a8399" font-size="11" font-weight="600" font-family="'Geist', sans-serif">Censoring auditors</text>
+        <text x="864" y="14" fill="#7a8399" font-size="9"  font-family="'Geist Mono', monospace">jurisdiction lock · legal threats</text>
+      </g>
+
+      <!-- =============================================================
+           BOUNDARY-CROSSING ARROWS (the load-bearing part)
+           ============================================================= -->
+
+      <!-- Arrow A: Adversary tries to forge a receipt → blocked at Zone 2 by signature -->
+      <path d="M 90 56 L 90 380 L 268 380" fill="none"
+            stroke="#991B1B" stroke-width="1.2"
+            stroke-dasharray="4,3" marker-end="url(#arrow-block)"/>
+      <rect x="40"  y="44" width="220" height="14" fill="#f5f5f5"/>
+      <text x="44" y="54" fill="#991B1B" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.10em">FORGE → BLOCKED · ED25519</text>
+
+      <!-- Arrow B: Adversary lies in inference (issuer dishonesty) → caught by witness re-execution at Zone 2 -->
+      <path d="M 600 100 L 600 144" fill="none"
+            stroke="#4f5d75" stroke-width="1.2"
+            stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+      <rect x="496" y="84" width="208" height="14" fill="#f5f5f5"/>
+      <text x="600" y="94" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">FABRICATE → CAUGHT · WITNESSES</text>
+
+      <!-- Arrow C: Zone 2 imports Zone 1 (the trust delegation that makes the protocol work) -->
+      <path d="M 1080 380 L 932 380" fill="none"
+            stroke="#059669" stroke-width="1.4"
+            marker-end="url(#arrow-accent)"/>
+      <rect x="900" y="364" width="208" height="14" fill="#f5f5f5"/>
+      <text x="1108" y="374" fill="#059669" font-size="8" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.10em">IMPORTS · NO MORE, NO LESS</text>
+
+      <!-- Arrow D: Compromise of Zone 1 → catastrophic (acknowledged) -->
+      <path d="M 600 728 L 600 524" fill="none"
+            stroke="#991B1B" stroke-width="1.2"
+            stroke-dasharray="4,3" marker-end="url(#arrow-block)"/>
+      <rect x="448" y="712" width="304" height="14" fill="#f5f5f5"/>
+      <text x="600" y="722" fill="#991B1B" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">BREAK ED25519 → ALL OCX VOID · OUT OF SCOPE</text>
+
+      <!-- =============================================================
+           LEGEND — horizontal strip
+           ============================================================= -->
+      <line x1="40" y1="700" x2="1160" y2="700" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+      <text x="40" y="720" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+
+      <!-- Trusted (focal) -->
+      <rect x="120" y="714" width="14" height="10" rx="2" fill="rgba(5,150,105,0.10)" stroke="#059669" stroke-width="1.2"/>
+      <text x="140" y="722" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Unconditionally trusted</text>
+
+      <!-- OCX construction -->
+      <rect x="296" y="714" width="14" height="10" rx="2" fill="rgba(45,49,66,0.025)" stroke="#4f5d75" stroke-width="1"/>
+      <text x="316" y="722" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">OCX construction</text>
+
+      <!-- Adversary -->
+      <rect x="448" y="714" width="14" height="10" rx="2" fill="rgba(45,49,66,0.018)" stroke="rgba(45,49,66,0.32)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="468" y="722" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Adversary's reach</text>
+
+      <!-- Blocked -->
+      <line x1="600" y1="720" x2="624" y2="720" stroke="#991B1B" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arrow-block)"/>
+      <text x="636" y="722" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Attack · blocked at boundary</text>
+
+      <!-- Trust import -->
+      <line x1="852" y1="720" x2="876" y2="720" stroke="#059669" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+      <text x="888" y="722" fill="#4f5d75" font-size="9" font-family="'Geist', sans-serif">Trust import (one-way)</text>
+    </svg>
+  </div>
+</body>
+</html>

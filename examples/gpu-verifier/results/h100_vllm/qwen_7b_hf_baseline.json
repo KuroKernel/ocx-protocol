@@ -1,0 +1,19 @@
+{
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "prompt": "Write a short poem about deterministic computation, exactly 4 lines. Just the poem:",
+  "seed": 42,
+  "generated_text": " No other text.\n\nIn circuits, logic flows,\nPredictable, unwaveringing choice.\nFrom input to output, no surprise,\nDeterminism in silicon's drive.",
+  "num_generated_tokens": 35,
+  "elapsed_s": 1.2865,
+  "logits_hash_hex": "61cab1489c9166b14334abc600793268f7f8147ba3b0951edfed471faa089756",
+  "output_hash_hex": "e7b1425964384fe09e59ef0d0458116f85f762b93fbf2498001468ce2aee1268",
+  "input_hash_hex": "7d023e65e354d2cbaee90009f5d5f7b09b339d1ddc46561008de3a4f5e5d9a98",
+  "program_hash_hex": "632ad719d95e0abdebee4ba872bf1cc81eac5709030617ea947ee4774adea263",
+  "signature_hex": "4cd38216ac51106f67819efa911c6e9e5e63b2a357958445f404e8e312f757b056846bdb7e4b27e0f6885070a52cc481c71a806b0654770c403f18d0a96ae006",
+  "public_key_hex": "a2de500094783bfa5e369741cacfeded680c67abb5d2110b2dd76607470ec82b",
+  "receipt_cbor_hex": "a8015820632ad719d95e0abdebee4ba872bf1cc81eac5709030617ea947ee4774adea2630258207d023e65e354d2cbaee90009f5d5f7b09b339d1ddc46561008de3a4f5e5d9a98035820e7b1425964384fe09e59ef0d0458116f85f762b93fbf2498001468ce2aee1268041823051a69ede328061a69ede32a07736f63782d6770752d76657269666965722d76300858404cd38216ac51106f67819efa911c6e9e5e63b2a357958445f404e8e312f757b056846bdb7e4b27e0f6885070a52cc481c71a806b0654770c403f18d0a96ae006",
+  "receipt_len_bytes": 209,
+  "verify_ok": true,
+  "verify_error": "OCX_SUCCESS",
+  "verify_elapsed_us": 14433.33
+}

@@ -197,7 +197,30 @@ The full reproducible test methodology including hardware matrix, prompts, expec
 
 ---
 
-## Claim 10: Adversarial spot-check verification catches a fabrication-rate-`f` issuer with probability `1 − (1 − f)^k` (lower bound) under uniform sampling of `k` receipts
+## Claim 10 (vLLM): vLLM with greedy sampling + fixed seed produces byte-identical `output_hash` across cold-started Python processes on NVIDIA H100
+
+**What it means:** vLLM is the production-throughput inference stack used by most large AI deployments. It is widely assumed (citing PagedAttention's atomic accumulation) to be too non-deterministic to wrap with reproducibility-dependent protocols. We test this empirically with vLLM 0.19.1, Qwen 2.5-7B-Instruct, greedy sampling, bf16, seed=42 on a single H100 SXM (Hopper sm_90, CUDA 12.4).
+
+**Why it matters:** if vLLM is byte-deterministic in this configuration, OCX receipts can be wrapped around production-grade serving without throwing away vLLM's throughput advantages over HF Transformers. The earlier paper draft assumed this was unlikely; the empirical test shows it is true for the configuration measured.
+
+**Tests verifying this claim:**
+
+| Test | Location |
+|---|---|
+| `vllm_determinism.py` (5 within-launch + 3 across-launch) | `whitepaper-tests/vllm_determinism.py` |
+| Within-launch results | `examples/gpu-verifier/results/h100_vllm/launch1.jsonl` (5 records) |
+| Across-launch results | `examples/gpu-verifier/results/h100_vllm/launch{1,2,3}.jsonl` (1 record each) |
+| HF Transformers comparison receipt | `examples/gpu-verifier/results/h100_vllm/qwen_7b_hf_baseline.json` |
+
+**Pass criterion:** every `output_hash` in `launch1.jsonl` (5 records) equal byte-for-byte; first-record `output_hash` in `launch{1,2,3}.jsonl` equal byte-for-byte across the three fresh Python processes.
+
+**Result:** all conditions met. `output_hash 748964e6e4b30a996686da404e331e304458a4e9d6543a10365a7d52ce3c449a` for all 5 + 3 = 8 measurements. The vLLM hash differs from the HF Transformers eager-attention reference (`e7b1425964...`) for the same model + prompt + dtype on the same H100, because vLLM's fused attention kernels reduce in a different order. Both stacks are individually byte-deterministic. The earlier received wisdom about vLLM non-determinism was wrong for this configuration.
+
+**Out of scope:** vLLM with sampling, concurrent dynamic batching, prefix caching across different prompts, vLLM on AMD ROCm, vLLM with `enforce_eager=True`. Each is a separate question.
+
+---
+
+## Claim 11: Adversarial spot-check verification catches a fabrication-rate-`f` issuer with probability `1 − (1 − f)^k` (lower bound) under uniform sampling of `k` receipts
 
 **What it means:** the standard cryptographic argument for probabilistic re-execution audit. Given a stream of `N` issued receipts of which `L = fN` are fabricated, a verifier that samples `k` receipts uniformly at random and re-executes them detects the cheater with probability `1 − C(N − L, k) / C(N, k)`, lower-bounded by `1 − (1 − f)^k`. A risk-weighted verifier that oversamples high-stakes receipts dominates uniform sampling against any adversary that concentrates lies on the stake-weighted subset.
 

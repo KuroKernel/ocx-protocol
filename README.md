@@ -22,6 +22,7 @@ The full technical statement is in the whitepaper at [`whitepaper/paper.pdf`](wh
 | Verification is sub-millisecond | 79.4 µs median, 114.6 µs p99, 12,392 receipts/sec on a single core | [`whitepaper-tests/bench_verify.py`](whitepaper-tests/bench_verify.py) |
 | Spot-check soundness matches `1 − (1−f)^k` | 70 cells × 10,000 Monte Carlo trials, 0 deviations from theory at the 5σ envelope | [`whitepaper-tests/SOUNDNESS_PROOF.md`](whitepaper-tests/SOUNDNESS_PROOF.md) |
 | Risk-weighted sampling beats uniform against targeted fraud | 9.76× higher catch rate at k=1 against a stake-targeting adversary | `adversarial_soundness.jsonl` |
+| **vLLM byte-determinism (production-throughput stack)** | vLLM 0.19.1 on H100 with greedy + seed: **3 / 3 cold-start launches byte-identical**, 5/5 within-launch byte-identical. Differs from HF Transformers reference (different fused kernels) — both individually deterministic | [`examples/gpu-verifier/results/h100_vllm/`](examples/gpu-verifier/results/h100_vllm/) |
 
 Cumulative test record: **312 deterministic-protocol assertions + 31,000+ pass observations across 10K verification benchmarks, 11K warm-model iterations, and 700K spot-check trials. Zero failures.**
 

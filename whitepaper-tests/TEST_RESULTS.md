@@ -30,6 +30,7 @@ This document is the empirical companion to `TEST_PLAN.md`. Numbers are reproduc
 | **Cross-vendor byte-identity (AMD MI300X ↔ NVIDIA H100, single-GPU)** | Qwen 2.5-72B at single-GPU bf16+eager, **9 fresh MI300X launches, 3 (model,length) groups, all match H100 baseline byte-for-byte**, including 51-token continuation |
 | **Cross-vendor boundary line drawn (multi-GPU)** | 2× MI300X tensor-parallel (RCCL fabric), 3 fresh launches, byte-identical within MI300X (`dd3fed4a...`, 58 tokens) but **differs from NVIDIA 2× H100 TP (NCCL ring)** as predicted by reduction-order topology |
 | **Cross-vendor receipt portability** | 12 / 12 AMD-produced receipts verified by `libocx-verify` built on x86 NVIDIA hardware (`OCX_SUCCESS`) |
+| **vLLM determinism on H100 (greedy + seed)** | **3 / 3 cold-start launches byte-identical**, **5 / 5 within-launch requests byte-identical**. vLLM hash differs from HF Transformers reference (different fused-kernel attention) — both individually deterministic |
 
 ---
 
@@ -219,6 +220,38 @@ All 9 MI300X receipts (3 short Qwen 0.5B + 3 short Qwen 72B + 3 long Qwen 72B) v
 Receipts: `examples/gpu-verifier/results/mi300x/qwen_*.json` (and `.cbor`).
 
 **Cross-vendor at multi-GPU scale (the boundary line).** We then ran the same poem prompt on 2× MI300X tensor-parallel using HuggingFace Transformers' native `tp_plan="auto"` (which dispatches collectives through RCCL fabric all-reduce on AMD, just as it dispatches through NCCL ring all-reduce on NVIDIA). Three fresh `torchrun` launches all produced `output_hash dd3fed4a55f1a550ebc16efe9ec84452f9cec5f67e89ee688030735316fff936` (58 tokens). Within-AMD-TP byte-identity holds (3/3 launches match, both ranks always agree per the in-script all-gather check). Cross-vendor at TP scale does NOT hold: AMD TP `dd3fed4a...` differs from NVIDIA H100 TP `f8dc73cb...`, and both differ from the AMD single-GPU `e59fca7d...`. Different all-reduce topologies (NCCL ring vs RCCL fabric vs no-collective) produce different reduction orders, which under greedy decoding produce different argmax tokens, which compound into different texts (the AMD TP poem reads "where paths are clear and **true**", the single-GPU MI300X variant reads "where paths are clear and **defined**"). Both substrates are individually byte-deterministic. This empirically draws the boundary of cross-vendor portability for the protocol's *computation* layer; the protocol's *receipt* layer remains vendor-portable in all cases (every AMD-produced receipt verifies through `libocx-verify` built on x86 NVIDIA — see Cross-vendor receipt portability headline above).
+
+---
+
+## vLLM determinism on NVIDIA H100
+
+vLLM is the production-throughput inference stack used by most large AI deployments. The standard assumption (often cited from vLLM's own issue tracker) is that PagedAttention's atomic accumulation makes vLLM non-deterministic. We tested this empirically on a fresh H100 SXM (Hopper sm_90, CUDA 12.4, vLLM 0.19.1) with Qwen 2.5-7B-Instruct, greedy sampling, bf16 dtype, seed=42.
+
+**Within a single vLLM server (5 identical requests):** **1 / 1 unique hash among 5 requests.** Output bytes byte-identical across repeated requests within the same server.
+
+**Across 3 fresh Python processes (cold-start each):** **1 / 1 unique hash among 3 launches.** All three cold-started vLLM instances produce `output_hash 748964e6e4b30a996686da404e331e304458a4e9d6543a10365a7d52ce3c449a` (29 tokens emitted). Generated text:
+
+```
+" In circuits, logic flows, A path unwaveringly chose, Determinism's cold embrace,
+  Where chance has no place to race."
+```
+
+**vLLM does NOT match the HF Transformers reference path** for the same model + prompt + dtype on the same H100. HF Transformers (eager attention) produces `e7b1425964384fe09e59ef0d0458116f85f762b93fbf2498001468ce2aee1268` (35 tokens, different poem). Both stacks are individually byte-deterministic; their outputs differ because vLLM's fused attention kernels reduce in a different order from `attn_implementation="eager"`. Both poems begin with the same first ~8 tokens (`" In circuits, logic flows,"`) before kernels diverge.
+
+**Implication for the protocol.** vLLM CAN be wrapped with OCX receipts: it is reproducible enough across cold-started Python processes for a verifier doing spot-check re-execution to be assured of byte-identity. The receipt's environment binding (vLLM version, attention backend, GPU SKU, driver, dtype) must be matched by the re-executor — receipts produced under HF Transformers eager attention will NOT verify if re-executed under vLLM, and vice versa. This is the same boundary the receipt's environment field is designed to handle. The earlier "vLLM is too non-deterministic to wrap" assumption was wrong for the configurations measured here.
+
+Reproduce:
+```
+$ pip install vllm
+$ python3 whitepaper-tests/vllm_determinism.py \
+    --model Qwen/Qwen2.5-7B-Instruct \
+    --n-requests 5 \
+    --output examples/gpu-verifier/results/h100_vllm/launch1.jsonl
+```
+
+Receipts: `examples/gpu-verifier/results/h100_vllm/{launch1,launch2,launch3}.jsonl` (vLLM hashes), `examples/gpu-verifier/results/h100_vllm/qwen_7b_hf_baseline.json` (HF Transformers comparison receipt).
+
+**Out of scope here:** vLLM with sampling (non-greedy), vLLM with concurrent requests / dynamic batching pressure, vLLM with prefix caching enabled across different prompts, vLLM on AMD ROCm, vLLM with CUDA graphs disabled (`enforce_eager=True`), vLLM with `--num-scheduler-steps>1`. Each is a separate question. The headline result here is that vLLM with greedy + seed + bf16 (the configuration most commonly used for reproducible serving) is byte-deterministic on H100.
 
 ---
 

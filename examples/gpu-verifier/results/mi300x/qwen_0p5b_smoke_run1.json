@@ -1,0 +1,19 @@
+{
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "prompt": "What is the capital of France? Answer in one word:",
+  "seed": 42,
+  "generated_text": " Paris. The capital of France is Paris.",
+  "num_generated_tokens": 10,
+  "elapsed_s": 0.4251,
+  "logits_hash_hex": "baa650f011b636b242ce8b791562b2ab474f322f3c4339e301a4c2e3e9e76bbe",
+  "output_hash_hex": "0fbfb8ecf647e1758a0af6cca95e6e3a086f9d82e958ec85ee7d4422cf31cfa7",
+  "input_hash_hex": "e98e5d969bc9ae47142fb8f1109752f9e58bd53f13dd16732097d10a702b57c0",
+  "program_hash_hex": "7102ee921bdac98ccd00d2137e8dfc69a1e005f742c0dd2f9387e651bba1f5e9",
+  "signature_hex": "71ae93f32ce3eabf405802f91fc712ddf86dec8e54556954a5bf2854849c4e0586a1366ba243a4437122733b09e6408814d83c7afc8b69ed5954ac3f4985f90c",
+  "public_key_hex": "a2de500094783bfa5e369741cacfeded680c67abb5d2110b2dd76607470ec82b",
+  "receipt_cbor_hex": "a80158207102ee921bdac98ccd00d2137e8dfc69a1e005f742c0dd2f9387e651bba1f5e9025820e98e5d969bc9ae47142fb8f1109752f9e58bd53f13dd16732097d10a702b57c00358200fbfb8ecf647e1758a0af6cca95e6e3a086f9d82e958ec85ee7d4422cf31cfa7040a051a69ed0947061a69ed094807736f63782d6770752d76657269666965722d763008584071ae93f32ce3eabf405802f91fc712ddf86dec8e54556954a5bf2854849c4e0586a1366ba243a4437122733b09e6408814d83c7afc8b69ed5954ac3f4985f90c",
+  "receipt_len_bytes": 208,
+  "verify_ok": true,
+  "verify_error": "OCX_SUCCESS",
+  "verify_elapsed_us": 16821.6
+}

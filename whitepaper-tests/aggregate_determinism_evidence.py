@@ -13,7 +13,8 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-RESULTS_DIR = ROOT / "examples" / "gpu-verifier" / "results" / "h100"
+RESULTS_DIR_H100 = ROOT / "examples" / "gpu-verifier" / "results" / "h100"
+RESULTS_DIR_MI300X = ROOT / "examples" / "gpu-verifier" / "results" / "mi300x"
 
 
 def classify(filename: str) -> tuple[str, str]:
@@ -35,18 +36,27 @@ def classify(filename: str) -> tuple[str, str]:
         return ("Mistral Mixtral-8x7B-Instruct (MoE) / 2×H100 tensor-parallel / bf16 / short-gen 32t", f)
     if f.startswith("mixtral_8x7b_tp_long"):
         return ("Mistral Mixtral-8x7B-Instruct (MoE) / 2×H100 tensor-parallel / bf16 / long-gen 128t", f)
+    if f.startswith("qwen_0p5b_smoke"):
+        return ("Qwen2.5-0.5B-Instruct / 1×AMD MI300X (CDNA3) / bf16 / 32t", f)
+    if f.startswith("qwen_72b_short"):
+        return ("Qwen2.5-72B-Instruct / 1×AMD MI300X (CDNA3) / bf16 / short-gen (5t emit)", f)
+    if f.startswith("qwen_72b_long"):
+        return ("Qwen2.5-72B-Instruct / 1×AMD MI300X (CDNA3) / bf16 / long-gen (51t emit)", f)
     return ("OTHER", f)
 
 
 def main():
     groups: dict[str, list[dict]] = defaultdict(list)
-    for path in sorted(RESULTS_DIR.glob("*.json")):
-        try:
-            data = json.loads(path.read_text())
-        except Exception:
+    for results_dir in (RESULTS_DIR_H100, RESULTS_DIR_MI300X):
+        if not results_dir.exists():
             continue
-        key, run_id = classify(path.name)
-        groups[key].append({"run_id": run_id, **data})
+        for path in sorted(results_dir.glob("*.json")):
+            try:
+                data = json.loads(path.read_text())
+            except Exception:
+                continue
+            key, run_id = classify(path.name)
+            groups[key].append({"run_id": run_id, **data})
 
     print("=" * 78)
     print("OCX DETERMINISM EVIDENCE (committed receipts on disk)")

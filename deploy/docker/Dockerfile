@@ -4,7 +4,7 @@
 # ============================================
 # Stage 1: Build
 # ============================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -19,10 +19,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build binaries
+# Build server binary (CGO_ENABLED=0 for static binary)
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /build/bin/ocx-server ./cmd/server
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /build/bin/ocx-cli ./cmd/cli
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /build/bin/ocx-worker ./cmd/worker
 
 # ============================================
 # Stage 2: Runtime
@@ -30,28 +28,23 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /build/bi
 FROM alpine:3.19 AS runtime
 
 # Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata bash
+RUN apk add --no-cache ca-certificates tzdata
 
 # Create non-root user
 RUN addgroup -g 1000 ocx && \
     adduser -u 1000 -G ocx -s /bin/sh -D ocx
 
 # Create directories
-RUN mkdir -p /app/data /app/logs /app/config && \
+RUN mkdir -p /app/bin /app/data /app/logs && \
     chown -R ocx:ocx /app
 
 WORKDIR /app
 
-# Copy binaries from builder
+# Copy binary from builder
 COPY --from=builder /build/bin/ocx-server /app/bin/
-COPY --from=builder /build/bin/ocx-cli /app/bin/
-COPY --from=builder /build/bin/ocx-worker /app/bin/
-
-# Copy config templates
-COPY --from=builder /build/config/*.yaml /app/config/
 
 # Set permissions
-RUN chmod +x /app/bin/*
+RUN chmod +x /app/bin/ocx-server
 
 # Switch to non-root user
 USER ocx
@@ -59,12 +52,10 @@ USER ocx
 # Environment variables
 ENV OCX_DATA_DIR=/app/data
 ENV OCX_LOG_DIR=/app/logs
-ENV OCX_CONFIG_DIR=/app/config
-ENV OCX_STRICT_MODE=true
-ENV GIN_MODE=release
+ENV OCX_PORT=8080
 
-# Expose ports
-EXPOSE 8080 9090 50051
+# Expose port
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

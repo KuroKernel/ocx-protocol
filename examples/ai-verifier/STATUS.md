@@ -137,7 +137,7 @@ Not yet tested: Qwen 13B, Qwen 32B, Llama-3.1-70B. Higher-precision quantization
 
 ### 2.4 D-MVM integration
 
-**Status: NOT STARTED.** The verifier runs in plain Python. It is not executing inside `ocx-protocol/pkg/deterministicvm/`. The roadmap in `docs/ROADMAP_FRONTIER.md` calls for wrapping inference through D-MVM so the execution environment itself is sandboxed and hash-equivalent across machines. Today the primitive relies on the end operator setting up a matching Python + llama-cpp-python + CPU-only environment. That is a trust boundary the D-MVM is supposed to eliminate.
+**Status: NOT STARTED.** The verifier runs in plain Python. It is not executing inside any sandboxed VM. Today the primitive relies on the end operator setting up a matching Python + llama-cpp-python + CPU-only environment. That is a trust boundary that a hash-equivalent execution environment would eliminate.
 
 ### 2.5 Small model, toy prompt
 

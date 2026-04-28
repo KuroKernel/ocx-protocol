@@ -23,7 +23,7 @@ const tiers = [
   {
     key: "starter",
     name: "Starter",
-    price: "$499",
+    price: "$999",
     cadence: "/month",
     sub: "For teams shipping their first verified product",
     features: [
@@ -33,12 +33,12 @@ const tiers = [
       "Email support · 48h response",
       "Audit logs · 30-day retention",
     ],
-    cta: { kind: "checkout", tier: "starter", label: "Subscribe — $499/mo" },
+    cta: { kind: "checkout", tier: "starter", label: "Subscribe — $999/mo" },
   },
   {
     key: "growth",
     name: "Growth",
-    price: "$1,499",
+    price: "$4,999",
     cadence: "/month",
     sub: "For production AI deployments at meaningful scale",
     features: [
@@ -49,13 +49,13 @@ const tiers = [
       "Audit logs · 90-day retention",
       "Custom issuer keys",
     ],
-    cta: { kind: "checkout", tier: "growth", label: "Subscribe — $1,499/mo" },
+    cta: { kind: "checkout", tier: "growth", label: "Subscribe — $4,999/mo" },
     highlight: true,
   },
   {
     key: "scale",
     name: "Scale",
-    price: "$4,999",
+    price: "$9,999",
     cadence: "/month",
     sub: "For high-throughput inference services",
     features: [
@@ -67,7 +67,7 @@ const tiers = [
       "Custom integrations",
       "Quarterly architecture reviews",
     ],
-    cta: { kind: "checkout", tier: "scale", label: "Subscribe — $4,999/mo" },
+    cta: { kind: "checkout", tier: "scale", label: "Subscribe — $9,999/mo" },
   },
 ];
 

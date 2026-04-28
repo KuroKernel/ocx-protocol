@@ -30,7 +30,6 @@ RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir \
       "fastapi>=0.115.0" "uvicorn[standard]>=0.32.0" \
       "pydantic>=2.9.0" "pydantic-settings>=2.5.0" \
-      "stripe>=11.4.0" \
       "sqlalchemy>=2.0.36" "psycopg[binary]>=3.2.3" "alembic>=1.14.0" \
       "httpx>=0.27.0" "python-multipart>=0.0.12" "email-validator>=2.2.0"
 

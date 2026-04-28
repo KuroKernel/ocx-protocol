@@ -62,7 +62,7 @@ app = FastAPI(
 )
 
 # CORS — allow the frontend (ocx.world) to POST to /v1/checkout and /v1/billing/portal.
-# Webhooks come straight from Stripe (no browser), so don't need CORS.
+# Webhooks come from LemonSqueezy server-to-server (no browser), so don't need CORS.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -104,7 +104,7 @@ def root():
         "endpoints": [
             "POST /v1/checkout/create-session",
             "POST /v1/billing/portal",
-            "POST /v1/webhooks/stripe",
+            "POST /v1/webhooks/lemonsqueezy",
             "POST /v1/verify",
             "GET  /v1/account",
         ],

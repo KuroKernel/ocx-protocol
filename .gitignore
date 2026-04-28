@@ -185,3 +185,4 @@ public.backup-*/
 api/.env
 *.db-shm
 *.db-wal
+.gstack/

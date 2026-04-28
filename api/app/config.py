@@ -10,12 +10,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # Stripe
-    stripe_secret_key: str = Field(..., description="sk_test_... or sk_live_...")
-    stripe_webhook_secret: str | None = Field(default=None, description="whsec_... from the endpoint config; webhooks 503 until set")
-    stripe_price_starter: str = Field(...)
-    stripe_price_growth: str = Field(...)
-    stripe_price_scale: str = Field(...)
+    # LemonSqueezy — Merchant of Record. The seller of record is
+    # LemonSqueezy; OpenKitaab Pvt Ltd receives a single payout from LS
+    # monthly. LS handles VAT / GST / sales-tax compliance globally.
+    ls_api_key: str = Field(..., description="LemonSqueezy API key (Bearer token, prefix `eyJ…`).")
+    ls_store_id: str = Field(..., description="The LemonSqueezy Store ID (number, e.g. 12345).")
+    ls_webhook_secret: str | None = Field(default=None, description="Webhook signing secret from the LS dashboard. Webhook endpoint 503s until set.")
+    ls_variant_starter: str = Field(..., description="Variant ID for the OCX Starter monthly plan.")
+    ls_variant_growth: str = Field(...,  description="Variant ID for the OCX Growth monthly plan.")
+    ls_variant_scale: str = Field(...,   description="Variant ID for the OCX Scale monthly plan.")
 
     # App
     app_url: str = "https://ocx.world"
@@ -38,25 +41,25 @@ class Settings(BaseSettings):
 
     @property
     def success_url(self) -> str:
-        return f"{self.app_url.rstrip('/')}{self.success_path}?session_id={{CHECKOUT_SESSION_ID}}"
+        return f"{self.app_url.rstrip('/')}{self.success_path}"
 
     @property
     def cancel_url(self) -> str:
         return f"{self.app_url.rstrip('/')}{self.cancel_path}"
 
-    def price_id_for_tier(self, tier: str) -> str | None:
+    def variant_id_for_tier(self, tier: str) -> str | None:
         return {
-            "starter": self.stripe_price_starter,
-            "growth": self.stripe_price_growth,
-            "scale": self.stripe_price_scale,
+            "starter": self.ls_variant_starter,
+            "growth": self.ls_variant_growth,
+            "scale": self.ls_variant_scale,
         }.get(tier)
 
-    def tier_for_price_id(self, price_id: str) -> str | None:
+    def tier_for_variant_id(self, variant_id: str) -> str | None:
         return {
-            self.stripe_price_starter: "starter",
-            self.stripe_price_growth: "growth",
-            self.stripe_price_scale: "scale",
-        }.get(price_id)
+            self.ls_variant_starter: "starter",
+            self.ls_variant_growth: "growth",
+            self.ls_variant_scale: "scale",
+        }.get(variant_id)
 
 
 @lru_cache(maxsize=1)

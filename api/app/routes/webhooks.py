@@ -1,23 +1,46 @@
-"""POST /v1/webhooks/stripe — receives Stripe webhook events.
+"""POST /v1/webhooks/lemonsqueezy — receives LemonSqueezy webhook events.
 
 Reliability properties this handler guarantees:
 
-  1. Signature verification — rejects forged events with 401.
-  2. Idempotency — every event_id is recorded in stripe_events; replays
-     after the first one are no-ops with 200.
-  3. Atomic per-event handling — DB writes happen in a transaction so a
-     mid-handler failure rolls back the event_id record too. Stripe will
-     retry, and the next attempt sees no record and re-runs cleanly.
-  4. 200 on handled, 4xx on permanent failure, 5xx on transient failure
-     (so Stripe retries with exponential backoff).
+  1. Signature verification (HMAC-SHA256, `X-Signature` header).
+     Forged events return 401.
+  2. Idempotency — every event id (`X-Event-Id` header, plus the body's
+     `meta.event_name + meta.custom_data + data.id` fingerprint) is
+     recorded in the `provider_events` table; replays after the first
+     are no-ops with 200.
+  3. Atomic per-event handling — DB writes happen in a transaction so
+     a mid-handler failure rolls back the dedup record too. LS will
+     retry, the next attempt sees no record, runs cleanly.
+  4. 200 on handled, 4xx on permanent failure, 5xx on transient
+     failure (LS retries 5xx with exponential backoff).
+
+Events handled:
+
+  • subscription_created      — new paid subscription. Issue API key,
+                                send welcome email.
+  • subscription_updated      — renewal, plan change, status change.
+                                Sync local row + tier flip.
+  • subscription_cancelled    — customer cancelled. Mark sub canceled,
+                                downgrade tier so /v1/verify rejects
+                                further requests.
+  • subscription_resumed      — customer un-cancelled before period end.
+                                Restore tier.
+  • subscription_expired      — billing failed permanently / period
+                                ended after a cancel. Same effect as
+                                cancelled.
+  • subscription_payment_success / _failed — logged for now; renewal
+                                logic handled by subscription_updated.
+
+Other event types (orders, products, license keys) are ignored — we
+don't sell one-shot products and we don't issue LS-hosted license
+keys (the API key is OCX-side, generated post-checkout).
 """
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timezone
+from typing import Any
 
-import stripe
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -26,306 +49,316 @@ from ..auth import generate_api_key
 from ..config import get_settings
 from ..db import get_db
 from ..email import send_api_key_email
-from ..models import Customer, StripeEvent, Subscription, Usage
+from ..lemonsqueezy import verify_webhook_signature
+from ..models import Customer, ProviderEvent, Subscription
 
 log = logging.getLogger("ocx.webhooks")
 router = APIRouter()
 
+PROVIDER = "lemonsqueezy"
 
-@router.post("/v1/webhooks/stripe")
-async def stripe_webhook(
+
+@router.post("/v1/webhooks/lemonsqueezy")
+async def lemonsqueezy_webhook(
     request: Request,
-    stripe_signature: str | None = Header(None, alias="Stripe-Signature"),
+    x_signature: str | None = Header(None, alias="X-Signature"),
+    x_event_name: str | None = Header(None, alias="X-Event-Name"),
     db: Session = Depends(get_db),
 ):
     s = get_settings()
-    if not s.stripe_webhook_secret:
-        # Webhook secret not configured yet (e.g. fresh deploy before the
-        # Stripe endpoint is wired up). Return 503 so Stripe retries once
-        # the env var is set, instead of crashing the app on import.
-        log.error("STRIPE_WEBHOOK_SECRET not set; cannot verify webhook")
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Webhook endpoint not configured")
-    payload = await request.body()
-    if not stripe_signature:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Missing Stripe-Signature header")
-    try:
-        event = stripe.Webhook.construct_event(
-            payload=payload,
-            sig_header=stripe_signature,
-            secret=s.stripe_webhook_secret,
+    if not s.ls_webhook_secret:
+        log.error("LS_WEBHOOK_SECRET not set; cannot verify webhook")
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Webhook endpoint not configured",
         )
-    except (ValueError, stripe.error.SignatureVerificationError) as e:
-        log.warning("Bad webhook signature: %s", e)
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid signature") from e
 
-    event_id = event["id"]
-    event_type = event["type"]
+    payload = await request.body()
+    if not verify_webhook_signature(
+        body=payload, signature=x_signature, secret=s.ls_webhook_secret
+    ):
+        log.warning("Bad LS webhook signature")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid signature")
 
-    # Idempotency: if we've seen this event before, return 200 without
-    # re-processing. (Stripe retries; this prevents double-charging,
-    # double-emailing, etc.)
-    if db.execute(select(StripeEvent).where(StripeEvent.event_id == event_id)).scalar_one_or_none():
-        log.info("Replay of event %s (%s) — skipping", event_id, event_type)
+    try:
+        body = await request.json()
+    except Exception as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Bad JSON: {e}") from e
+
+    meta = body.get("meta") or {}
+    data = body.get("data") or {}
+    event_name = meta.get("event_name") or x_event_name or "unknown"
+    obj_id = str(data.get("id") or "")
+    # LS doesn't always send a stable event_id; build one from the
+    # event-name + the object id + the event timestamp on meta.
+    event_id = f"{event_name}:{obj_id}:{meta.get('webhook_id') or meta.get('test_mode') or ''}"
+
+    if db.execute(
+        select(ProviderEvent).where(ProviderEvent.event_id == event_id)
+    ).scalar_one_or_none():
+        log.info("Replay of %s — skipping", event_id)
         return {"received": True, "replay": True}
 
-    log.info("Processing event %s type=%s", event_id, event_type)
+    log.info("Processing event %s type=%s", event_id, event_name)
 
     try:
-        handler = _HANDLERS.get(event_type)
+        handler = _HANDLERS.get(event_name)
         if handler is None:
-            log.info("Ignoring unhandled event type %s", event_type)
+            log.info("Ignoring unhandled LS event %s", event_name)
         else:
-            handler(event["data"]["object"], db)
+            handler(body, db)
 
-        # Record the event AFTER successful handling so a thrown handler
-        # rolls back the marker too and Stripe will retry.
-        db.add(StripeEvent(event_id=event_id, event_type=event_type, received_at=_utc_now()))
+        db.add(ProviderEvent(
+            event_id=event_id,
+            provider=PROVIDER,
+            event_type=event_name,
+            received_at=_utc_now(),
+        ))
         db.commit()
         return {"received": True}
     except HTTPException:
         raise
     except Exception as e:
-        log.exception("Handler crashed for event %s (%s)", event_id, event_type)
+        log.exception("Handler crashed for event %s (%s)", event_id, event_name)
         db.rollback()
-        # 500 → Stripe retries. Different from 4xx (give up).
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, f"Handler failed: {e}") from e
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, f"Handler failed: {e}"
+        ) from e
 
 
 # ============================================================
-# Handlers — one per event type. Each takes (object, db_session).
+# Helpers
 # ============================================================
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _ts_to_dt(ts: int | None) -> datetime | None:
-    if ts is None:
+def _parse_iso(s: str | None) -> datetime | None:
+    if not s:
         return None
-    return datetime.fromtimestamp(ts, tz=timezone.utc)
+    try:
+        # LemonSqueezy timestamps look like "2024-01-15T08:23:45.000000Z"
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
+        return None
 
 
-def _to_dict(obj) -> dict:
-    """Stripe SDK returns StripeObject (which behaves like a dict for [] but
-    NOT for .get()). Normalize to a real dict so downstream .get() works.
-    Recursive: nested StripeObjects also become dicts."""
-    if hasattr(obj, "to_dict_recursive"):
-        return obj.to_dict_recursive()
-    if hasattr(obj, "to_dict"):
-        # Fallback: shallow + manually recurse
-        d = obj.to_dict()
-        return {k: _to_dict(v) if hasattr(v, "to_dict") else v for k, v in d.items()}
-    return dict(obj) if obj else {}
+def _custom(body: dict[str, Any]) -> dict[str, Any]:
+    """Custom data the buyer passed at checkout, echoed back here.
+    Used to carry the ocx_tier from /v1/checkout/create-session."""
+    return ((body.get("meta") or {}).get("custom_data") or {})
 
 
-def _extract_period(sub_obj: dict) -> tuple[datetime | None, datetime | None]:
-    """Stripe API v2025-05-28+ moved current_period_start/end from the
-    subscription's top level into each subscription item. Read from the
-    item first, fall back to top-level for older accounts/API versions."""
-    items = (sub_obj.get("items") or {}).get("data") or []
-    if items:
-        first = items[0]
-        start = _ts_to_dt(first.get("current_period_start"))
-        end = _ts_to_dt(first.get("current_period_end"))
-        if start and end:
-            return start, end
-    # Fallback: top-level (older API versions)
-    return (
-        _ts_to_dt(sub_obj.get("current_period_start")),
-        _ts_to_dt(sub_obj.get("current_period_end")),
+def _attrs(body: dict[str, Any]) -> dict[str, Any]:
+    return ((body.get("data") or {}).get("attributes") or {})
+
+
+# ============================================================
+# Handlers — one per event name
+# ============================================================
+
+def _handle_subscription_created(body: dict[str, Any], db: Session) -> None:
+    """First event after a successful checkout. Create the customer
+    record, issue the API key, send the welcome email."""
+    s = get_settings()
+    attrs = _attrs(body)
+    sub_id = str((body.get("data") or {}).get("id") or "")
+    customer_provider_id = str(attrs.get("customer_id") or "")
+    email = attrs.get("user_email") or ""
+
+    tier = (
+        _custom(body).get("ocx_tier")
+        or s.tier_for_variant_id(str(attrs.get("variant_id") or ""))
+        or "starter"
     )
 
-
-def _handle_checkout_completed(obj_raw, db: Session) -> None:
-    """checkout.session.completed — first event after a successful payment.
-    Creates the customer record + generates an API key + emails it.
-    """
-    s = get_settings()
-    stripe.api_key = s.stripe_secret_key
-    obj = _to_dict(obj_raw)
-
-    stripe_customer_id = obj.get("customer")
-    if not stripe_customer_id:
-        # Fixture-triggered events from `stripe trigger` sometimes have no
-        # real customer attached. Skip — nothing to bind a record to.
-        log.info("checkout.session.completed without customer id (likely a fixture); skipping")
+    if not customer_provider_id:
+        log.info("subscription_created without customer_id; skipping")
         return
 
-    email = (obj.get("customer_details") or {}).get("email") or obj.get("customer_email") or ""
-    tier = (obj.get("metadata") or {}).get("ocx_tier")
-    if not tier:
-        # Fallback: inspect the subscription for the price → tier
-        sub_id = obj.get("subscription")
-        if sub_id:
-            sub = _to_dict(stripe.Subscription.retrieve(sub_id))
-            price_id = sub["items"]["data"][0]["price"]["id"]
-            tier = s.tier_for_price_id(price_id) or "starter"
-        else:
-            tier = "starter"
-
-    # If we already saw this customer (e.g. they churned then resubscribed),
-    # don't re-issue a key. Update tier + email instead.
     existing = db.execute(
-        select(Customer).where(Customer.stripe_customer_id == stripe_customer_id)
+        select(Customer).where(
+            Customer.provider == PROVIDER,
+            Customer.provider_customer_id == customer_provider_id,
+        )
     ).scalar_one_or_none()
+
+    now = _utc_now()
     if existing:
-        log.info("checkout.completed for existing customer %s; updating tier=%s", email, tier)
+        log.info("subscription_created for known customer %s; updating tier=%s", email, tier)
         existing.tier = tier
         existing.email = email or existing.email
-        existing.updated_at = _utc_now()
-        return
-
-    plaintext, digest, prefix = generate_api_key()
-    now = _utc_now()
-    customer = Customer(
-        stripe_customer_id=stripe_customer_id,
-        email=email,
-        api_key_hash=digest,
-        api_key_prefix=prefix,
-        tier=tier,
-        created_at=now,
-        updated_at=now,
-    )
-    db.add(customer)
-    db.flush()  # get id
-
-    # Belt-and-suspenders: fetch the subscription from Stripe and create
-    # the local row HERE. Stripe doesn't guarantee event ordering — the
-    # `customer.subscription.created` webhook may arrive before this one.
-    # If we wait for it, we depend on Stripe's retry timing. Better to
-    # eagerly create the row now while we already have the IDs at hand.
-    sub_id = obj.get("subscription")
-    if sub_id:
+        existing.updated_at = now
+        customer = existing
+    else:
+        plaintext, digest, prefix = generate_api_key()
+        customer = Customer(
+            provider=PROVIDER,
+            provider_customer_id=customer_provider_id,
+            email=email,
+            api_key_hash=digest,
+            api_key_prefix=prefix,
+            tier=tier,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(customer)
+        db.flush()
         try:
-            sub_obj = _to_dict(stripe.Subscription.retrieve(sub_id))
-            existing = db.execute(
-                select(Subscription).where(Subscription.stripe_subscription_id == sub_id)
-            ).scalar_one_or_none()
-            period_start, period_end = _extract_period(sub_obj)
-            if not existing:
-                db.add(Subscription(
-                    stripe_subscription_id=sub_id,
-                    customer_id=customer.id,
-                    status=sub_obj.get("status", "active"),
-                    price_id=sub_obj["items"]["data"][0]["price"]["id"],
-                    current_period_start=period_start or now,
-                    current_period_end=period_end or now,
-                    cancel_at_period_end=bool(sub_obj.get("cancel_at_period_end", False)),
-                    created_at=now,
-                    updated_at=now,
-                ))
-        except Exception as e:
-            log.warning("Failed to pre-fetch subscription %s: %s. Will sync on subscription.updated.", sub_id, e)
-            # Not fatal; customer.subscription.updated will run later and create it.
+            send_api_key_email(to=email, api_key=plaintext, tier=tier)
+        except Exception:
+            log.warning("Email send failed for %s; key generated but not delivered", email)
 
-    # Send the welcome email with the plaintext key.
-    # Done OUTSIDE the DB transaction's critical section but inside the
-    # webhook's try/except so a Postmark failure can trigger Stripe retry
-    # → idempotency check finds the customer already exists → no double-send.
-    try:
-        send_api_key_email(to=email, api_key=plaintext, tier=tier)
-    except Exception:
-        log.warning("Email send failed for new customer %s; key was generated but not delivered", email)
-        # Don't re-raise — the customer record is created, they can request
-        # a key reset via support. Better than blocking the webhook.
+    _upsert_subscription(db, body, customer.id, tier, now)
 
 
-def _handle_subscription_event(obj_raw, db: Session) -> None:
-    """customer.subscription.{created,updated} — keep our copy in sync."""
+def _handle_subscription_updated(body: dict[str, Any], db: Session) -> None:
+    """Renewal, plan change, or status change. Keep the local copy in
+    sync. If the variant id moved (tier change), update the customer's
+    tier too."""
     s = get_settings()
-    obj = _to_dict(obj_raw)
-    sub_id = obj["id"]
-    customer_stripe_id = obj["customer"]
+    attrs = _attrs(body)
+    customer_provider_id = str(attrs.get("customer_id") or "")
+    variant_id = str(attrs.get("variant_id") or "")
 
     customer = db.execute(
-        select(Customer).where(Customer.stripe_customer_id == customer_stripe_id)
+        select(Customer).where(
+            Customer.provider == PROVIDER,
+            Customer.provider_customer_id == customer_provider_id,
+        )
     ).scalar_one_or_none()
     if customer is None:
-        # Race: subscription event arrived before checkout.session.completed.
-        # Raise so the webhook returns 5xx and Stripe retries — by the time
-        # of the retry, checkout.completed has run and the customer exists.
-        # (Idempotency guarantees we don't duplicate work on retry.)
-        log.warning("subscription event for unknown customer %s; raising 500 so Stripe retries", customer_stripe_id)
-        raise RuntimeError(f"Customer {customer_stripe_id} not yet known; will retry after checkout.completed")
+        # Race: subscription_updated arrived before subscription_created.
+        # Raise so LS retries.
+        raise RuntimeError(
+            f"Customer {customer_provider_id} not yet known; will retry"
+        )
 
-    price_id = obj["items"]["data"][0]["price"]["id"]
-    new_tier = s.tier_for_price_id(price_id)
-    if new_tier and new_tier != customer.tier:
+    new_tier = s.tier_for_variant_id(variant_id) or customer.tier
+    if new_tier != customer.tier:
         log.info("Customer %s tier change: %s → %s", customer.email, customer.tier, new_tier)
         customer.tier = new_tier
         customer.updated_at = _utc_now()
 
-    existing_sub = db.execute(
-        select(Subscription).where(Subscription.stripe_subscription_id == sub_id)
+    _upsert_subscription(db, body, customer.id, new_tier, _utc_now())
+
+
+def _handle_subscription_cancelled(body: dict[str, Any], db: Session) -> None:
+    """Customer cancelled — sub stays active until period end then LS
+    fires subscription_expired. Mark cancel_at_period_end so the UI
+    reflects the pending cancel."""
+    sub_id = str((body.get("data") or {}).get("id") or "")
+    sub = db.execute(
+        select(Subscription).where(
+            Subscription.provider == PROVIDER,
+            Subscription.provider_subscription_id == sub_id,
+        )
+    ).scalar_one_or_none()
+    if sub:
+        sub.cancel_at_period_end = True
+        sub.status = "cancelled"
+        sub.updated_at = _utc_now()
+        log.info("Subscription cancelled (will expire at period end) for %s", sub.customer.email)
+
+
+def _handle_subscription_expired(body: dict[str, Any], db: Session) -> None:
+    """Subscription period ended after cancel, OR billing failed
+    permanently. Demote the customer."""
+    sub_id = str((body.get("data") or {}).get("id") or "")
+    sub = db.execute(
+        select(Subscription).where(
+            Subscription.provider == PROVIDER,
+            Subscription.provider_subscription_id == sub_id,
+        )
+    ).scalar_one_or_none()
+    if sub:
+        sub.status = "expired"
+        sub.updated_at = _utc_now()
+        sub.customer.tier = "expired"
+        sub.customer.updated_at = _utc_now()
+        log.info("Subscription expired for %s", sub.customer.email)
+
+
+def _handle_subscription_resumed(body: dict[str, Any], db: Session) -> None:
+    """Customer un-cancelled before the period ended."""
+    sub_id = str((body.get("data") or {}).get("id") or "")
+    sub = db.execute(
+        select(Subscription).where(
+            Subscription.provider == PROVIDER,
+            Subscription.provider_subscription_id == sub_id,
+        )
+    ).scalar_one_or_none()
+    if sub:
+        sub.cancel_at_period_end = False
+        sub.status = "active"
+        sub.updated_at = _utc_now()
+        log.info("Subscription resumed for %s", sub.customer.email)
+
+
+def _handle_payment(body: dict[str, Any], db: Session) -> None:
+    attrs = _attrs(body)
+    log.info("LS payment event: id=%s status=%s amount=%s",
+             (body.get("data") or {}).get("id"),
+             attrs.get("status"),
+             attrs.get("total_formatted"))
+
+
+def _upsert_subscription(
+    db: Session,
+    body: dict[str, Any],
+    customer_id: int,
+    tier: str,
+    now: datetime,
+) -> None:
+    attrs = _attrs(body)
+    sub_id = str((body.get("data") or {}).get("id") or "")
+    variant_id = str(attrs.get("variant_id") or "")
+    period_start = _parse_iso(attrs.get("created_at")) or now
+    period_end = _parse_iso(attrs.get("renews_at") or attrs.get("ends_at")) or now
+    portal_url = ((attrs.get("urls") or {}).get("customer_portal"))
+    status_ = attrs.get("status") or "active"
+    cancel_at_period_end = bool(attrs.get("cancelled"))
+
+    existing = db.execute(
+        select(Subscription).where(
+            Subscription.provider == PROVIDER,
+            Subscription.provider_subscription_id == sub_id,
+        )
     ).scalar_one_or_none()
 
-    period_start, period_end = _extract_period(obj)
-    status_ = obj.get("status", "unknown")
-    cancel_at_period_end = bool(obj.get("cancel_at_period_end", False))
-    now = _utc_now()
-
-    if existing_sub:
-        existing_sub.status = status_
-        existing_sub.price_id = price_id
-        if period_start:
-            existing_sub.current_period_start = period_start
-        if period_end:
-            existing_sub.current_period_end = period_end
-        existing_sub.cancel_at_period_end = cancel_at_period_end
-        existing_sub.updated_at = now
+    if existing:
+        existing.status = status_
+        existing.variant_id = variant_id or existing.variant_id
+        existing.current_period_start = period_start
+        existing.current_period_end = period_end
+        existing.cancel_at_period_end = cancel_at_period_end
+        if portal_url:
+            existing.portal_url = portal_url
+        existing.updated_at = now
     else:
         db.add(Subscription(
-            stripe_subscription_id=sub_id,
-            customer_id=customer.id,
+            provider=PROVIDER,
+            provider_subscription_id=sub_id,
+            customer_id=customer_id,
             status=status_,
-            price_id=price_id,
-            current_period_start=period_start or now,
-            current_period_end=period_end or now,
+            variant_id=variant_id,
+            current_period_start=period_start,
+            current_period_end=period_end,
             cancel_at_period_end=cancel_at_period_end,
+            portal_url=portal_url,
             created_at=now,
             updated_at=now,
         ))
 
 
-def _handle_subscription_deleted(obj_raw, db: Session) -> None:
-    """customer.subscription.deleted — mark sub canceled. We DON'T delete
-    the customer record (they might come back); we set tier='canceled'
-    so /v1/verify rejects further calls."""
-    obj = _to_dict(obj_raw)
-    sub_id = obj["id"]
-    sub = db.execute(
-        select(Subscription).where(Subscription.stripe_subscription_id == sub_id)
-    ).scalar_one_or_none()
-    if sub:
-        sub.status = "canceled"
-        sub.updated_at = _utc_now()
-        # Demote the customer (no other active sub, so they lose API access)
-        sub.customer.tier = "canceled"
-        sub.customer.updated_at = _utc_now()
-        log.info("Subscription canceled for customer %s", sub.customer.email)
-
-
-def _handle_invoice_paid(obj_raw, db: Session) -> None:
-    """invoice.paid — could send a receipt email here. For now just log."""
-    obj = _to_dict(obj_raw)
-    log.info("invoice.paid: %s (%s) amount=%s",
-             obj.get("id"), obj.get("customer_email") or obj.get("customer"),
-             obj.get("amount_paid"))
-
-
-def _handle_invoice_payment_failed(obj_raw, db: Session) -> None:
-    """invoice.payment_failed — send a dunning email or flag account.
-    Stripe Smart Retries will keep trying; we just log here."""
-    obj = _to_dict(obj_raw)
-    log.warning("invoice.payment_failed: %s (%s) attempt=%s",
-                obj.get("id"), obj.get("customer"), obj.get("attempt_count"))
-
-
 _HANDLERS = {
-    "checkout.session.completed": _handle_checkout_completed,
-    "customer.subscription.created": _handle_subscription_event,
-    "customer.subscription.updated": _handle_subscription_event,
-    "customer.subscription.deleted": _handle_subscription_deleted,
-    "invoice.paid": _handle_invoice_paid,
-    "invoice.payment_failed": _handle_invoice_payment_failed,
+    "subscription_created":          _handle_subscription_created,
+    "subscription_updated":          _handle_subscription_updated,
+    "subscription_cancelled":        _handle_subscription_cancelled,
+    "subscription_expired":          _handle_subscription_expired,
+    "subscription_resumed":          _handle_subscription_resumed,
+    "subscription_payment_success":  _handle_payment,
+    "subscription_payment_failed":   _handle_payment,
+    "subscription_payment_recovered": _handle_payment,
 }

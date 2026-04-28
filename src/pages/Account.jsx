@@ -52,7 +52,7 @@ export default function Account() {
             Your account.
           </h1>
           <p className="mt-8 sm:mt-10 text-stone-600 text-base sm:text-lg leading-relaxed">
-            Look up tier and current usage, or open the Stripe-hosted billing
+            Look up tier and current usage, or open the hosted billing
             portal to update payment method, change tier, or download invoices.
           </p>
         </div>

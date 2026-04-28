@@ -3,7 +3,14 @@ import { Link, useSearchParams } from "react-router-dom";
 
 export default function Welcome() {
   const [params] = useSearchParams();
-  const sessionId = params.get("session_id");
+  // LemonSqueezy redirects with `?order_number=...&order_id=...&...`.
+  // We surface whichever id the provider passes for support reference.
+  const orderId =
+    params.get("order_id") ||
+    params.get("order_number") ||
+    params.get("checkout") ||
+    params.get("subscription") ||
+    null;
 
   return (
     <>
@@ -51,9 +58,9 @@ export default function Welcome() {
               />
             </div>
 
-            {sessionId && (
+            {orderId && (
               <p className="mt-12 sm:mt-16 text-[12px] mono text-stone-500 break-all">
-                stripe_session_id: {sessionId}
+                order_ref: {orderId}
               </p>
             )}
           </div>

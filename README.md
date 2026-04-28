@@ -169,7 +169,7 @@ ocx-protocol/
 
 Research-grade, not a turnkey product. The protocol primitive (Layers 1 + 2) is complete and tested at frontier scale. Layer 3 (witness consensus) is designed but not yet implemented. There is no managed hosted service. There are no commercial pilots.
 
-The whitepaper is being prepared for arXiv submission. The repository is currently private and will be made public once trademark filings on "OCX" are complete. After that, every commit referenced in the paper is fixed and reproducible.
+The whitepaper is being prepared for IACR ePrint submission. Every commit referenced in the paper is fixed and reproducible.
 
 ---
 

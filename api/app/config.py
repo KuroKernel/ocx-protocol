@@ -10,15 +10,24 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # LemonSqueezy — Merchant of Record. The seller of record is
-    # LemonSqueezy; OpenKitaab Pvt Ltd receives a single payout from LS
-    # monthly. LS handles VAT / GST / sales-tax compliance globally.
-    ls_api_key: str = Field(..., description="LemonSqueezy API key (Bearer token, prefix `eyJ…`).")
-    ls_store_id: str = Field(..., description="The LemonSqueezy Store ID (number, e.g. 12345).")
-    ls_webhook_secret: str | None = Field(default=None, description="Webhook signing secret from the LS dashboard. Webhook endpoint 503s until set.")
-    ls_variant_starter: str = Field(..., description="Variant ID for the OCX Starter monthly plan.")
-    ls_variant_growth: str = Field(...,  description="Variant ID for the OCX Growth monthly plan.")
-    ls_variant_scale: str = Field(...,   description="Variant ID for the OCX Scale monthly plan.")
+    # LemonSqueezy — Merchant of Record. All fields optional so the app
+    # can boot before LS is wired up; the relevant routes return 503
+    # ("provider not configured") until every required field is set.
+    ls_api_key: str | None = Field(default=None, description="LemonSqueezy API key (Bearer token).")
+    ls_store_id: str | None = Field(default=None, description="LemonSqueezy Store ID (numeric).")
+    ls_webhook_secret: str | None = Field(default=None, description="Webhook signing secret. Webhook endpoint 503s until set.")
+    ls_variant_starter: str | None = Field(default=None, description="Variant ID for the OCX Starter monthly plan.")
+    ls_variant_growth: str | None = Field(default=None, description="Variant ID for the OCX Growth monthly plan.")
+    ls_variant_scale: str | None = Field(default=None, description="Variant ID for the OCX Scale monthly plan.")
+
+    @property
+    def ls_configured(self) -> bool:
+        """True iff every LS field needed for /v1/checkout is set.
+        The webhook handler additionally requires ls_webhook_secret."""
+        return bool(
+            self.ls_api_key and self.ls_store_id and
+            self.ls_variant_starter and self.ls_variant_growth and self.ls_variant_scale
+        )
 
     # App
     app_url: str = "https://ocx.world"

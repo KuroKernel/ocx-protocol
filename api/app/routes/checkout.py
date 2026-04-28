@@ -29,6 +29,13 @@ class CreateSessionResponse(BaseModel):
 def create_session(body: CreateSessionBody):
     s = get_settings()
 
+    if not s.ls_configured:
+        log.error("LS_* env vars not fully set; checkout disabled")
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Checkout is not yet configured. Email hello@kitaab.live.",
+        )
+
     variant_id = s.variant_id_for_tier(body.tier)
     if not variant_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown tier: {body.tier}")

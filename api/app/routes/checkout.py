@@ -45,6 +45,12 @@ def create_session(body: CreateSessionBody):
             billing_address_collection="auto",
             # tax id collection is fine to enable; comment out if you don't want it
             tax_id_collection={"enabled": True},
+            # Force USD-only checkout. The marketing page advertises USD
+            # prices, the Price objects are USD, the customer sees USD at
+            # checkout — no IP-based local-currency conversion. Belt-and-
+            # suspenders against the account-level Adaptive Pricing toggle
+            # being flipped back on.
+            adaptive_pricing={"enabled": False},
             subscription_data={
                 "metadata": {"ocx_tier": body.tier},
             },

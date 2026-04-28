@@ -1,8 +1,0 @@
-/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad6-kafka/src/main/java/dev/ocx/kafka/OCXClient.java
-/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad6-kafka/src/main/java/dev/ocx/kafka/VerificationRequest.java
-/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad6-kafka/src/main/java/dev/ocx/kafka/OCXProducerInterceptor.java
-/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad6-kafka/src/main/java/dev/ocx/kafka/MessageContext.java
-/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad6-kafka/src/main/java/dev/ocx/kafka/OCXConsumerInterceptor.java
-/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad6-kafka/src/main/java/dev/ocx/kafka/BenchmarkRunner.java
-/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad6-kafka/src/main/java/dev/ocx/kafka/OCXVerificationException.java
-/home/kurokernel/Desktop/AXIS/ocx-protocol/adapters/ad6-kafka/src/main/java/dev/ocx/kafka/OCXReceipt.java

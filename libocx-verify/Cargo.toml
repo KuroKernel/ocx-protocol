@@ -10,12 +10,31 @@ publish = false
 crate-type = ["cdylib", "staticlib", "rlib"] # For FFI, static linking, and Rust use.
 
 [features]
-default = ["ffi"]
-ffi = []
+# Default preserves backward compatibility: C FFI build still pulls ring
+# and the verify module exactly as before. New consumers (wasm, embedded)
+# can opt out via `default-features = false` and pick a smaller surface.
+default = ["ffi", "verify-ring", "system-time"]
+
+# The C FFI shim. Depends on `verify-ring` because the FFI exposes the
+# full ring-backed verification API.
+ffi = ["verify-ring"]
+
+# The full canonical verifier with dual-library cross-check (ring +
+# ed25519-dalek). This is what the C FFI and the Rust crate's classic
+# call sites rely on.
+verify-ring = ["dep:ring"]
+
+# Wall-clock freshness check ("finished_at not in the future"). Requires
+# std::time::SystemTime, which wasm32-unknown-unknown does not implement.
+# When off, structural + cryptographic verification still runs in full;
+# only the freshness boundary is skipped.
+system-time = []
+
+# Build-time tracing (eprintln!). Off by default.
 trace = []
 
 [dependencies]
-ring = { version = "0.17", default-features = false, features = ["std", "alloc"] } # Crypto primitives.
+ring = { version = "0.17", default-features = false, features = ["std", "alloc"], optional = true } # Crypto primitives (gated behind `verify-ring`).
 ed25519-dalek = { version = "2.0", features = ["rand_core"] } # Dual-library verification.
 hex = "0.4" # Hex encoding for debug output.
 base64 = "0.21" # Base64 encoding/decoding for key management.

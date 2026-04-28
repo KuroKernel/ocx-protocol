@@ -1,7 +1,0 @@
-# Nixpacks configuration for OCX Protocol
-# Uses Dockerfile for multi-stage Rust+Go build
-[phases.setup]
-onlyIncludeFiles = ["Dockerfile"]
-
-[phases.build]
-cmds = ["echo 'Using Dockerfile for build'"]

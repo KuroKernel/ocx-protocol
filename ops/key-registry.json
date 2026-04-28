@@ -1,4 +1,0 @@
-{
-  "ocx-server": {"pub_b64": "jUKQWFUHK/Qi+RMV2yAJw3JwD6A0WYCuWnr5wJiUHN8=", "role": "sign/verify"},
-  "ocx-cli":    {"pub_b64": "HoVY9C8O8FlQcapyJ4aSc91lpPvv4mb4RQIXHlngS8I=", "role": "sign/verify"}
-}

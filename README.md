@@ -50,13 +50,14 @@ Layer 1 — Deterministic computation              [PRODUCTION for HF Transforme
 
 | Path | Language | Purpose |
 |---|---|---|
-| [`pkg/receipt/`](pkg/receipt/) | Go | Canonical CBOR encoder, `ReceiptCore` schema, signing path |
+| [`pkg/receipt/`](pkg/receipt/) | Go | Canonical CBOR encoder + `ReceiptCore` schema (the protocol's canonical reference, kept minimal) |
 | [`pkg/keystore/`](pkg/keystore/) | Go | Ed25519 keystore; defines the `OCXv1\|receipt\|` domain separator |
 | [`libocx-verify/`](libocx-verify/) | Rust | Canonical offline verifier; C FFI; the only verifier that signs in this codebase |
 | [`examples/gpu-verifier/`](examples/gpu-verifier/) | Python | Deterministic GPU inference + receipt generation; OpenAI-compatible HTTP endpoint |
 | [`whitepaper-tests/`](whitepaper-tests/) | Python + Go | Test plan, results, cross-language round-trip, verification benchmark, adversarial soundness simulator, long-run stability |
 | [`whitepaper/`](whitepaper/) | LaTeX | The whitepaper source and rendered PDF |
-| [`cmd/server/`](cmd/server/) | Go | Reference HTTP server for the deterministic-VM execution path (Layer-1 wrapper) |
+| [`api/`](api/) | Python | FastAPI service for billing + key issuance; not part of the protocol surface, lives here for convenience |
+| [`sdk/typescript/`](sdk/typescript/) | TypeScript | `@ocx-protocol/sdk` — typed client for receipt generation and verification |
 
 The receipt schema, canonical encoding, and verifier together comprise about 2,500 lines of cross-language code. The deterministic GPU inference setup — the load-bearing part for AI-specific applications — is about 400 lines of Python configuration on top of HuggingFace Transformers.
 
@@ -152,14 +153,14 @@ The full limitations section is [`whitepaper/paper.tex` §7](whitepaper/paper.te
 ocx-protocol/
 ├── whitepaper/                The whitepaper (LaTeX source + rendered PDF + build README)
 ├── whitepaper-tests/          Test plan, results, soundness proof, all paper-cited tests
-├── pkg/                       Go: core protocol (receipt, keystore, verify, chain, executor)
+├── pkg/                       Go: protocol reference (receipt schema + canonical CBOR + keystore)
 ├── libocx-verify/             Rust: canonical offline verifier with C FFI
 ├── examples/
 │   ├── gpu-verifier/          Python: deterministic GPU inference + receipts (the AI-specific path)
-│   ├── ai-verifier/           Python: earlier CPU-side LLM determinism evidence (Pi 5 + x86)
-│   └── ...                    Other examples and reference clients
-├── cmd/server/                Go: reference HTTP server for the deterministic-VM execution path
-├── docs/                      Operational and design documentation
+│   └── ai-verifier/           Python: earlier CPU-side LLM determinism evidence (Pi 5 + x86)
+├── api/                       Python: FastAPI service for billing and API-key issuance
+├── sdk/typescript/            TypeScript: @ocx-protocol/sdk client library
+├── docs/                      Diagrams referenced by the website
 └── LICENSE                    MIT
 ```
 

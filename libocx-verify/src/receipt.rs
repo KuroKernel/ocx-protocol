@@ -3,6 +3,10 @@
 use crate::canonical_cbor::{CanonicalValue, CborParser};
 use crate::VerificationError;
 use std::collections::BTreeMap;
+// SystemTime is only used for the optional "not in the future" freshness
+// check. wasm32-unknown-unknown doesn't implement SystemTime — that build
+// turns the freshness check off, gated behind the `system-time` feature.
+#[cfg(feature = "system-time")]
 use std::time::{SystemTime, UNIX_EPOCH};
 use serde_cbor;
 
@@ -377,15 +381,21 @@ impl OcxReceipt {
             return Err(VerificationError::InvalidTimestamp);
         }
 
-        // Check that timestamps are not too far in the future (max 5 minutes clock skew)
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|_| VerificationError::InvalidTimestamp)?
-            .as_secs();
-        
-        const MAX_CLOCK_SKEW: u64 = 5 * 60; // 5 minutes
-        if finished_at > now + MAX_CLOCK_SKEW {
-            return Err(VerificationError::InvalidTimestamp);
+        // Check that timestamps are not too far in the future (max 5 minutes
+        // clock skew). Only available when the host has a wall clock —
+        // wasm32-unknown-unknown opts out, leaving the cryptographic check
+        // and the duration sanity check above as the verification surface.
+        #[cfg(feature = "system-time")]
+        {
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(|_| VerificationError::InvalidTimestamp)?
+                .as_secs();
+
+            const MAX_CLOCK_SKEW: u64 = 5 * 60; // 5 minutes
+            if finished_at > now + MAX_CLOCK_SKEW {
+                return Err(VerificationError::InvalidTimestamp);
+            }
         }
 
         Ok(())

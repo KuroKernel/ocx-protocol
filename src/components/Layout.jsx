@@ -2,10 +2,44 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { Wordmark } from "./Logo";
 
+const CONTACT_EMAIL = "hhaishwary@gmail.com";
+
 const navItems = [
   { to: "/paper", label: "Whitepaper" },
   { to: "/spec", label: "Specification" },
 ];
+
+/* Click-to-copy contact button. Replaces `mailto:` (which opens a
+   webmail tab on systems without a default mail client). One click
+   copies the address to the clipboard and briefly flips the label
+   to "Copied · email" so the user knows what's now in their
+   clipboard without trusting the silent action. */
+function useCopyContact() {
+  const [copied, setCopied] = useState(false);
+  const copy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(CONTACT_EMAIL);
+    } catch {
+      // clipboard may be denied (older browsers, no https) — fall
+      // back to a hidden textarea + execCommand
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = CONTACT_EMAIL;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      } catch {
+        /* give up silently */
+      }
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }, []);
+  return { copied, copy };
+}
 
 /* ------------------------------------------------------------------
    Header
@@ -97,13 +131,11 @@ const Header = () => {
         </nav>
 
         <div className="flex items-center gap-2">
-          {/* Contact link — visible on every viewport but compacted on mobile */}
-          <a
-            href="mailto:hhaishwary@gmail.com"
+          {/* Contact — click copies the email to clipboard. No mailto. */}
+          <ContactButton
             className="hidden sm:inline-flex text-[14px] font-medium text-ink hover:text-stone-600 transition-colors duration-150 px-2 py-2"
-          >
-            Contact →
-          </a>
+            idleLabel="Contact →"
+          />
 
           {/* Hamburger — only on viewports below md */}
           <button
@@ -193,13 +225,12 @@ const MobileMenu = ({ open, onClose }) => {
           <span>Account</span>
           <span className="text-stone-400 text-[16px]">→</span>
         </Link>
-        <a
-          href="mailto:hhaishwary@gmail.com"
+        <ContactButton
           onClick={onClose}
           className="mt-8 inline-flex items-center justify-center px-6 py-4 border border-ink bg-ink text-paper text-[15px] font-medium"
-        >
-          Contact →
-        </a>
+          idleLabel="Contact →"
+          dark
+        />
         <a
           href="https://github.com/KuroKernel/ocx-protocol"
           className="mt-4 text-center text-stone-500 text-[14px] py-3"
@@ -237,14 +268,54 @@ const Footer = () => (
         </div>
       </div>
       <div className="flex flex-col sm:flex-row sm:items-baseline gap-y-3 gap-x-8 text-stone-500 text-[13px]">
-        <a href="mailto:hhaishwary@gmail.com" className="link-mute break-all">
-          hhaishwary@gmail.com
-        </a>
+        <ContactButton
+          className="link-mute break-all"
+          idleLabel={CONTACT_EMAIL}
+          copiedLabel={CONTACT_EMAIL + " · copied"}
+        />
         <span>© 2026</span>
       </div>
     </div>
   </footer>
 );
+
+/* ------------------------------------------------------------------
+   ContactButton — single shared component for everywhere we used to
+   stick a `mailto:` link. Click copies CONTACT_EMAIL to clipboard
+   and flashes the label briefly to confirm. No new tab, no mailto
+   handler, no popup.
+   - idleLabel:    text shown when not in the "just-copied" state
+   - copiedLabel:  text shown for ~1.8s after a click (default:
+                   "Copied · email")
+   - dark:         flips the contrast of the success flash for use
+                   on a dark/inked button
+------------------------------------------------------------------- */
+export function ContactButton({
+  className = "",
+  idleLabel = "Contact →",
+  copiedLabel,
+  dark = false,
+  onClick,
+}) {
+  const { copied, copy } = useCopyContact();
+  const handle = (e) => {
+    copy();
+    if (onClick) onClick(e);
+  };
+  const flash = copiedLabel || `Copied · ${CONTACT_EMAIL}`;
+  return (
+    <button
+      type="button"
+      onClick={handle}
+      aria-live="polite"
+      className={className}
+      style={{ cursor: "pointer", appearance: "none" }}
+      title="Click to copy email address"
+    >
+      {copied ? flash : idleLabel}
+    </button>
+  );
+}
 
 export default function Layout({ children }) {
   return (

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { ContactButton } from "../components/Layout";
 
 /* ==================================================================
    Motion primitives — small, achromatic, in-house.
@@ -202,12 +203,10 @@ export default function Home() {
           className="mt-10 sm:mt-16 lg:mt-20 flex flex-col xs:flex-row xs:items-center gap-4 xs:gap-6 sm:gap-8"
         >
           <Link to="/paper" className="btn w-full xs:w-auto">Read the whitepaper</Link>
-          <a
-            href="mailto:hhaishwary@gmail.com"
+          <ContactButton
             className="link-mute text-[14px] py-2 xs:py-0"
-          >
-            Get in touch →
-          </a>
+            idleLabel="Get in touch →"
+          />
         </Reveal>
       </section>
 

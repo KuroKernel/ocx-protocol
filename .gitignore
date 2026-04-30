@@ -186,3 +186,7 @@ api/.env
 *.db-shm
 *.db-wal
 .gstack/
+
+# agent-demo: output is regenerated per run; venv is local
+examples/agent-demo/venv/
+examples/agent-demo/output/

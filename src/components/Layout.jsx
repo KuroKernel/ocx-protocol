@@ -5,7 +5,6 @@ import { Wordmark } from "./Logo";
 const navItems = [
   { to: "/paper", label: "Whitepaper" },
   { to: "/spec", label: "Specification" },
-  { to: "/pricing", label: "Pricing" },
 ];
 
 /* ------------------------------------------------------------------
@@ -99,12 +98,12 @@ const Header = () => {
 
         <div className="flex items-center gap-2">
           {/* Contact link — visible on every viewport but compacted on mobile */}
-          <Link
-            to="/pricing#contact"
+          <a
+            href="mailto:hhaishwary@gmail.com"
             className="hidden sm:inline-flex text-[14px] font-medium text-ink hover:text-stone-600 transition-colors duration-150 px-2 py-2"
           >
             Contact →
-          </Link>
+          </a>
 
           {/* Hamburger — only on viewports below md */}
           <button
@@ -194,13 +193,13 @@ const MobileMenu = ({ open, onClose }) => {
           <span>Account</span>
           <span className="text-stone-400 text-[16px]">→</span>
         </Link>
-        <Link
-          to="/pricing#contact"
+        <a
+          href="mailto:hhaishwary@gmail.com"
           onClick={onClose}
           className="mt-8 inline-flex items-center justify-center px-6 py-4 border border-ink bg-ink text-paper text-[15px] font-medium"
         >
-          Contact sales →
-        </Link>
+          Contact →
+        </a>
         <a
           href="https://github.com/KuroKernel/ocx-protocol"
           className="mt-4 text-center text-stone-500 text-[14px] py-3"
@@ -229,7 +228,6 @@ const Footer = () => (
         <div className="flex flex-wrap items-baseline gap-x-8 gap-y-3">
           <Link to="/paper" className="link-mute text-[14px] sm:text-[13px]">Whitepaper</Link>
           <Link to="/spec" className="link-mute text-[14px] sm:text-[13px]">Spec</Link>
-          <Link to="/pricing" className="link-mute text-[14px] sm:text-[13px]">Pricing</Link>
           <a
             href="https://github.com/KuroKernel/ocx-protocol"
             className="link-mute text-[14px] sm:text-[13px]"

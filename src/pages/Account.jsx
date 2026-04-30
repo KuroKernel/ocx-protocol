@@ -133,7 +133,7 @@ export default function Account() {
             from the address you subscribed with. We&apos;ll rotate the key and send the new one.
           </p>
           <p className="mt-5 sm:mt-6 text-stone-500 text-[14px] leading-relaxed">
-            Or browse <Link to="/pricing" className="link">pricing</Link> for tier details.
+            Or read the <Link to="/paper" className="link">whitepaper</Link> for protocol details.
           </p>
         </div>
       </section>

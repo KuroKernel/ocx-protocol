@@ -201,13 +201,13 @@ export default function Home() {
           delay={280}
           className="mt-10 sm:mt-16 lg:mt-20 flex flex-col xs:flex-row xs:items-center gap-4 xs:gap-6 sm:gap-8"
         >
-          <Link to="/pricing" className="btn w-full xs:w-auto">See pricing</Link>
-          <Link
-            to="/pricing#contact"
+          <Link to="/paper" className="btn w-full xs:w-auto">Read the whitepaper</Link>
+          <a
+            href="mailto:hhaishwary@gmail.com"
             className="link-mute text-[14px] py-2 xs:py-0"
           >
-            Talk to sales →
-          </Link>
+            Get in touch →
+          </a>
         </Reveal>
       </section>
 
@@ -448,12 +448,12 @@ export default function Home() {
               <Link to="/paper" className="btn w-full xs:w-auto">
                 Whitepaper · 467 KB PDF
               </Link>
-              <Link
-                to="/pricing#contact"
+              <a
+                href="https://github.com/KuroKernel/ocx-protocol"
                 className="link-mute text-[14px] py-2 xs:py-0"
               >
-                Or talk to us about a pilot →
-              </Link>
+                Source on GitHub →
+              </a>
             </div>
           </Reveal>
         </div>

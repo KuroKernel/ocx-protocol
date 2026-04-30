@@ -266,6 +266,10 @@ export default function Home() {
                   Real signed receipt · 211 wire bytes · the canonical Rust
                   verifier (200 LOC, MIT) confirms the signature offline in
                   microseconds.
+                  {" "}
+                  <Link to="/agent" className="link">
+                    Watch a live agent run produce one →
+                  </Link>
                 </div>
               </div>
             </Reveal>

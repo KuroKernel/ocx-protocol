@@ -203,10 +203,10 @@ export default function Home() {
         >
           <Link to="/paper" className="btn w-full xs:w-auto">Read the whitepaper</Link>
           <a
-            href="mailto:hello@ocx.world"
+            href="mailto:hhaishwary@gmail.com"
             className="link-mute text-[14px] py-2 xs:py-0"
           >
-            hello@ocx.world →
+            hhaishwary@gmail.com →
           </a>
         </Reveal>
       </section>

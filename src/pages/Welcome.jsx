@@ -39,7 +39,7 @@ export default function Welcome() {
               <Step
                 n="1"
                 title="Find the email"
-                body="Subject line is &lsquo;Your OCX API key&rsquo;. From hello@ocx.world. Check spam if you don't see it within a minute."
+                body="Subject line is &lsquo;Your OCX API key&rsquo;. From hhaishwary@gmail.com. Check spam if you don't see it within a minute."
               />
               <Step
                 n="2"
@@ -74,8 +74,8 @@ export default function Welcome() {
           </h2>
           <p className="mt-5 sm:mt-6 text-stone-600 leading-relaxed">
             Email{" "}
-            <a href="mailto:hello@ocx.world" className="link break-all">
-              hello@ocx.world
+            <a href="mailto:hhaishwary@gmail.com" className="link break-all">
+              hhaishwary@gmail.com
             </a>{" "}
             from the address you subscribed with. We&apos;ll rotate the key and send the new one.
           </p>

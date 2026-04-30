@@ -148,15 +148,19 @@ def run_agent(
     else:
         log.warning("agent hit MAX_STEPS (%d) without producing a final text turn", MAX_STEPS)
 
-    # Persist the report and emit a file_write receipt
+    # Persist the report and emit a file_write receipt that binds the
+    # FULL sha256 of the bytes — so anyone can `sha256sum report.md`
+    # and match it against the chain's recorded hash.
+    import hashlib
     output_dir.mkdir(parents=True, exist_ok=True)
     report_path = output_dir / "report.md"
     report_bytes = (final_text or "(empty report — agent did not produce text)").encode("utf-8")
     report_path.write_bytes(report_bytes)
+    report_sha256 = hashlib.sha256(report_bytes).hexdigest()
     chain.append(step_now(
         kind="file_write:report.md",
         inputs={"path": "report.md", "bytes": len(report_bytes)},
-        outputs={"path": "report.md", "sha256_prefix": _sha_prefix(report_bytes)},
+        outputs={"path": "report.md", "sha256": report_sha256},
         cycles=max(1, len(report_bytes)),
     ))
 

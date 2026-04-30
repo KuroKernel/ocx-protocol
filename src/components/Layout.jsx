@@ -99,10 +99,10 @@ const Header = () => {
         <div className="flex items-center gap-2">
           {/* Contact link — visible on every viewport but compacted on mobile */}
           <a
-            href="mailto:hhaishwary@gmail.com"
+            href="mailto:hello@ocx.world"
             className="hidden sm:inline-flex text-[14px] font-medium text-ink hover:text-stone-600 transition-colors duration-150 px-2 py-2"
           >
-            Contact →
+            hello@ocx.world
           </a>
 
           {/* Hamburger — only on viewports below md */}
@@ -194,11 +194,11 @@ const MobileMenu = ({ open, onClose }) => {
           <span className="text-stone-400 text-[16px]">→</span>
         </Link>
         <a
-          href="mailto:hhaishwary@gmail.com"
+          href="mailto:hello@ocx.world"
           onClick={onClose}
           className="mt-8 inline-flex items-center justify-center px-6 py-4 border border-ink bg-ink text-paper text-[15px] font-medium"
         >
-          Contact →
+          hello@ocx.world
         </a>
         <a
           href="https://github.com/KuroKernel/ocx-protocol"
@@ -237,8 +237,8 @@ const Footer = () => (
         </div>
       </div>
       <div className="flex flex-col sm:flex-row sm:items-baseline gap-y-3 gap-x-8 text-stone-500 text-[13px]">
-        <a href="mailto:hhaishwary@gmail.com" className="link-mute break-all">
-          hhaishwary@gmail.com
+        <a href="mailto:hello@ocx.world" className="link-mute break-all">
+          hello@ocx.world
         </a>
         <span>© 2026</span>
       </div>

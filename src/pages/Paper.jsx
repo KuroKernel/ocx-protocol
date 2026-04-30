@@ -27,8 +27,8 @@ export default function Paper() {
             <span aria-hidden="true">·</span>
             <span>OCX Protocol</span>
             <span aria-hidden="true">·</span>
-            <a href="mailto:hhaishwary@gmail.com" className="link-mute break-all">
-              hhaishwary@gmail.com
+            <a href="mailto:hello@ocx.world" className="link-mute break-all">
+              hello@ocx.world
             </a>
           </p>
           <div className="mt-10 sm:mt-14 flex flex-col xs:flex-row xs:items-baseline gap-4 xs:gap-6">

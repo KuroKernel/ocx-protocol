@@ -8,6 +8,7 @@ import Welcome from "./pages/Welcome";
 import Account from "./pages/Account";
 import VerifyMoved from "./pages/VerifyMoved";
 import Agent from "./pages/Agent";
+import Contact from "./pages/Contact";
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/account" element={<Account />} />
         <Route path="/agent" element={<Agent />} />
+        <Route path="/contact" element={<Contact />} />
 
         {/* Legacy verification URLs embedded in receipts issued before the
             in-browser verifier was retired. Render a "moved" page that shows

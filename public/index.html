@@ -77,5 +77,25 @@
   <body class="bg-paper text-ink antialiased">
     <noscript>This site requires JavaScript to run.</noscript>
     <div id="root"></div>
+
+    <!--
+      Static form definition for Netlify Forms detection. Netlify's
+      build-time crawler requires a real <form> with `data-netlify`
+      to register the endpoint; the React-rendered version on /contact
+      then POSTs to it. Hidden so end-users never see this.
+      https://docs.netlify.com/forms/setup/#html-forms
+    -->
+    <form
+      name="contact"
+      data-netlify="true"
+      netlify-honeypot="bot-field"
+      hidden
+    >
+      <input type="text" name="name" />
+      <input type="email" name="email" />
+      <input type="text" name="company" />
+      <textarea name="message"></textarea>
+      <input type="text" name="bot-field" />
+    </form>
   </body>
 </html>

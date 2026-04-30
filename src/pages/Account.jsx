@@ -126,10 +126,9 @@ export default function Account() {
             Lost your API key?
           </h2>
           <p className="mt-5 sm:mt-6 text-stone-600 leading-relaxed">
-            Email{" "}
-            <a href="mailto:hhaishwary@gmail.com" className="link break-all">
-              hhaishwary@gmail.com
-            </a>{" "}
+            <Link to="/contact" className="link">
+              Send us a message
+            </Link>{" "}
             from the address you subscribed with. We&apos;ll rotate the key and send the new one.
           </p>
           <p className="mt-5 sm:mt-6 text-stone-500 text-[14px] leading-relaxed">

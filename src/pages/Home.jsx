@@ -206,7 +206,7 @@ export default function Home() {
             href="mailto:hhaishwary@gmail.com"
             className="link-mute text-[14px] py-2 xs:py-0"
           >
-            hhaishwary@gmail.com →
+            Get in touch →
           </a>
         </Reveal>
       </section>
